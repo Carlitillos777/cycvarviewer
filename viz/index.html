@@ -973,13 +973,13 @@ function flowSVG(mode, N, p) {
   const notes = [], n = t => { notes.push(t); return MARKS[notes.length - 1] + ' '; };
   const cart = mode.startsWith('cart'), selfN = ['cartU', 'cartHU', 'cartGU', 'cartGG'].includes(mode);
   const under = Math.max(p.dwell, cartFill(64, p.ss) - 1), cyc = p.cartGap + p.dwell;
-  const check = cart ? 'a whole cart cycle to find out' : 'the hopper sees it at once';
+  const check = cart ? 'a whole cart trip to find out' : 'the hopper can tell straight away';
   const sliceNote = cart
-    ? `Cart slice: hopper minecarts loaded 0-U-U-U-U (slot 1 is the variable filter, the rest are blocked) take turns under the box. The first cart takes the box's first item, and that names the slice's item; every later cart already carries it and can only pull that item. A cart leaves once it reads the detection level (SS${p.ss}); a cart that leaves below it means the box has no more of the item, so the box is done. That's why a box costs at least one cart cycle at every slice it visits, even when it never held the item.`
-      + (selfN ? ' When the first item is an unstackable it fills the cart at once: that cart only removes it, and the next cart tries again with the next item.'
-        : ' These cores can\'t take a box that leads with an unstackable, so a LUIF always comes first.')
-      + ' At reset the partial output box is ejected and the item forgotten.'
-    : 'Slice (hopper core): the variable-filter hopper takes the box\'s first item, which names the slice\'s item, then pulls only that item; when the box has no more of it, the box leaves. At reset the partial output box is ejected and the item forgotten.';
+    ? `Cart slice: minecarts take turns parking under the box and sucking items out of it. The first cart grabs whatever item comes first in the box, and from then on that's the only item this slice collects: every cart after it is set to that item. A cart leaves once it's full enough (SS${p.ss}). If a cart leaves before that, the box has run out of the item and moves on. So every box spends at least one cart trip at every slice it visits, even if it never had that slice's item.`
+      + (selfN ? ' If the first thing in the box doesn\'t stack, the cart just takes it out, and the next cart tries again with the next item.'
+        : ' These slices can\'t deal with a box that starts with something that doesn\'t stack, so a LUIF always cleans the box first.')
+      + ' When the slice resets, it sends out its last, partly filled box and forgets its item.'
+    : 'Slice (hopper): the hopper takes the first item in the box, and from then on that\'s the only item this slice collects. When the box has none of it left, the box moves on. When the slice resets, it sends out its last, partly filled box and forgets its item.';
   const cartCyc = `SS${p.ss} · ${p.cartGap} + ≥${p.dwell} gt cycles`;
   let sm = '';
   const slice = (x, y, i, when) => {
@@ -993,19 +993,19 @@ function flowSVG(mode, N, p) {
   const returnLane = (fromX, y, LU, why) => arrow([[fromX, y], [LU[0] + 30, y], [LU[0] + 30, LU[1] + H]], `${n(why)}leftovers ${p.back} gt`, true, LU[0] + STEP, y - 5);
   const X0 = 20, IN = [X0, R1];
   box(...IN, ['Input chest', `${p.batch} boxes, 1 / ${p.input} gt`]);
-  const inNote = () => n(`Input: boxes come in batches of ${p.batch}; a new batch only starts once the previous one has fully left the machine.`);
-  const luifNote = 'LUIF: removes the box\'s leading unstackables (to the unstackable output) until a stackable item comes first, and drops empty boxes. Groupers and filter cores break on a box that leads with an unstackable, so boxes pass the LUIF first.';
+  const inNote = () => n(`Input: boxes come in batches of ${p.batch}. The next batch only goes in once every box of the current one has left the machine.`);
+  const luifNote = 'LUIF: takes out any items at the front of the box that don\'t stack (they go to their own output) until a stackable item comes first, and throws away empty boxes. Groupers and slices get confused by a box that starts with an unstackable, so every box is cleaned here first.';
   const luifAt = (x, y) => { box(x, y, [n(luifNote) + 'LUIF', `${p.luif} gt + ${p.unst} gt / unstackable`]); arrow([[x + W / 2, y], [x + W / 2, y - 26]], ''); out.push(`<text x="${x + W / 2 - 6}" y="${y - 16}" text-anchor="end" font-size="10" fill="var(--muted)">unstackables, empties</text>`); };
-  const cycleNote = 'Next cycle: once every box of the cycle is through, all slices reset together and forget their items, and the buffer goes round again.';
+  const cycleNote = 'Next cycle: once every box has been through, all slices reset together and forget their items, and the boxes in the buffer go round again.';
   if (mode === 'multi' || mode === 'cartMG') {
     const LU = [X0 + STEP, R1], BU = [X0 + 2 * STEP, R1], G = [X0 + 3 * STEP, R1], RG = [X0 + 4 * STEP, R1];
     arrow([right(...IN), left(...LU)], `${inNote()}${p.link} gt`);
     luifAt(...LU); box(...BU, ['Buffer', `${p.batch} slots`], 'circle');
-    box(...G, [n(`Global grouper: once the whole batch is in the buffer it takes the first box's first item and checks every buffer box (${p.grouper} gt each); all boxes holding that item form a group, the naming box first. It keeps only one group waiting${p.waitSlice ? ', and only groups while a slice is free and every leftover box is back in the buffer' : ''}.`) + 'Grouper', `${p.grouper} gt per box`, p.waitSlice ? 'waits: free slice' : '1 group ahead'], 'diamond');
+    box(...G, [n(`Global grouper: waits until the whole batch is in the buffer. Then it looks at the first item of the first box and gathers every box in the buffer that contains that item into a group. Only one finished group waits at a time${p.waitSlice ? ', and it only makes a new group while a slice is free and every leftover box is back' : ''}.`) + 'Grouper', `${p.grouper} gt per box`, p.waitSlice ? 'waits: free slice' : '1 group ahead'], 'diamond');
     box(...RG, ['Ready group', 'to first free slice']);
     arrow([right(...LU), left(...BU)], `${p.link} gt`); arrow([right(...BU), left(...G)], ''); arrow([right(...G), left(...RG)], '');
     const busY = R2 - 24, laneY = R2 + H + 64;
-    const toNote = n(`A ready group goes to the first free slice (${p.toSlice} gt), whatever its number. The slice works through the group's boxes (its first box names the item) and resets on its own when the group is done: slices don't wait for each other, so there are no global cycles and output isn't ideal.`);
+    const toNote = n(`A finished group goes to whichever slice is free first. The slice takes its item out of the group's boxes and then resets on its own, without waiting for the other slices. There are no shared cycles, which is why output isn't always ideal.`);
     for (let i = 0; i < N; i++) {
       const S = [X0 + 2 * STEP + i * STEP, R2];
       slice(...S, i, 'after its group');
@@ -1013,20 +1013,20 @@ function flowSVG(mode, N, p) {
       lane(S[0] + 24, R2 + H, laneY);
       output(...S);
     }
-    returnLane(X0 + 2 * STEP + (N - 1) * STEP + 24, laneY, LU, `Leftovers: a box the slice is done with still holds other items, so it goes back to the LUIF (${p.back} gt), then the buffer, to be grouped again.`);
+    returnLane(X0 + 2 * STEP + (N - 1) * STEP + 24, laneY, LU, `Leftovers: once a slice is done with a box, the box may still contain other items, so it goes back through the LUIF to the buffer to be grouped again.`);
   } else if (LOCALG.includes(mode)) {
     const local = isLocalM(mode), LU = [X0 + STEP, R1], back = local || mode === 'cartG', chain = mode === 'grouped' || mode === 'cartGU';
     arrow([right(...IN), left(...LU)], `${inNote()}${p.link} gt`);
     luifAt(...LU);
     const gx = i => X0 + (local ? 3 : 2) * STEP + i * STEP;
     let BU;
-    if (local) { BU = [X0 + 2 * STEP, R1]; box(...BU, ['Buffer', 'boxes keep circling'], 'circle'); arrow([right(...LU), left(...BU)], `${p.link} gt`); arrow([right(...BU), left(gx(0), R1)], n(`The buffer sends a box to grouper 1 (one per ${p.input} gt) while any slice is free${p.waitSlice ? ' and every leftover box is back' : ''}.`) + 'slice free', false, BU[0] + W + 14, R1 + H / 2 - 18); }
+    if (local) { BU = [X0 + 2 * STEP, R1]; box(...BU, ['Buffer', 'boxes keep circling'], 'circle'); arrow([right(...LU), left(...BU)], `${p.link} gt`); arrow([right(...BU), left(gx(0), R1)], n(`The buffer lets a box go to grouper 1 whenever at least one slice is free${p.waitSlice ? ' and every leftover box is back' : ''}.`) + 'slice free', false, BU[0] + W + 14, R1 + H / 2 - 18); }
     else { BU = [gx(N), R1]; box(...BU, ['Buffer', 'next cycle after reset'], 'circle'); arrow([right(...LU), left(gx(0), R1)], `${p.link} gt`); }
-    const gNote = n(`Grouper i checks each box (${p.grouper} gt) against slice i's item; a box it doesn't claim moves on to grouper i+1 (${p.hop} gt).`);
+    const gNote = n('Grouper i looks at each box and asks: does it contain my slice\'s item? If not, the box moves on to the next grouper.');
     const cNote = n(local
-      ? `A free slice's grouper takes the first item of the box it's checking as the slice's item and claims that box; a busy slice's grouper keeps claiming boxes with its item; a resetting slice lets boxes pass. Claimed boxes queue at the core.`
-      : `Grouper i sends a box holding slice i's item down to core i (${p.hop} gt) and keeps checking the boxes behind it; a grouper whose slice has no item yet names it from the box's first item.`
-        + (mode === 'cartG' ? ' Here a grouper keeps its latest matching box (its filter) until it has seen every box of the cycle, including the ones coming round again from earlier cores; only then that box goes down too.' : ''));
+      ? 'If its slice is free, the grouper takes the first item of the box as the slice\'s new item and sends that box to it. While the slice is busy, it keeps sending boxes with that same item. While the slice is resetting, boxes just go past. Boxes sent to a slice wait in line there.'
+      : 'When a box contains this grouper\'s item, the grouper sends it down to its slice and carries on checking the boxes behind. If the grouper has no item yet, it takes the first item of the box it\'s looking at.'
+        + (mode === 'cartG' ? ' In this version the grouper holds on to the last box it matched until it has seen every box of the cycle, including boxes coming back round from earlier slices; only then does that box go down too.' : ''));
     for (let i = 0; i < N; i++) {
       const G = [gx(i), R1], S = [gx(i), R2];
       box(...G, [(i ? '' : gNote) + `Grouper ${i + 1}`, `${p.grouper} gt per box`], 'diamond');
@@ -1034,8 +1034,8 @@ function flowSVG(mode, N, p) {
       arrow([bottom(...G), top(...S)], (i ? '' : cNote) + `claims ${p.hop} gt`);
       if (i < N - 1) arrow([right(...G), left(gx(i + 1), R1)], `${p.hop} gt`);
       if (chain) {                                   // core i -> core i+1, the last core -> buffer (right angles only)
-        if (i < N - 1) arrow([right(...S), left(gx(i + 1), R2)], (i ? '' : n(`Core i → core i+1 (${p.hop} gt): once core i is done with a box it never goes back to a grouper, it walks the remaining cores instead. Each core checks it (${check}) and unloads its own item if the box has it; a core with no item yet takes the first item of the box that reaches it, so slice i gets its item from whichever box arrives first, from grouper i or from core i-1. Boxes queue at a core first come, first served. The grouper can't see the core: if a box from the core line names core i first, core i's item and grouper i's item can differ, and output isn't always ideal.`)) + `${p.hop} gt`);
-        else { const gapX = S[0] + W + 15; arrow([right(...S), [gapX, S[1] + H / 2], [gapX, R1 + H + 22], [gx(N) + W / 2, R1 + H + 22], [gx(N) + W / 2, R1 + H + 6]], n('The last core sends its boxes to the buffer, where they wait for the next cycle.') + `${p.link} gt`, false, gapX + 16, (R1 + H + 22 + S[1] + H / 2) / 2); }
+        if (i < N - 1) arrow([right(...S), left(gx(i + 1), R2)], (i ? '' : n(`Slice i → slice i+1: once a slice is done with a box, the box doesn't go back to the groupers; it visits the remaining slices one by one. Each slice checks whether the box has its item (${check}) and takes it out if so. A slice that doesn't have an item yet takes the first item of whichever box reaches it first, whether it came from its grouper or from the slice before. Boxes wait in line in the order they arrive. The grouper can't see which item its slice ended up with, so if a box from the slice before got there first, the two may be after different items, and output isn't always ideal.`)) + `${p.hop} gt`);
+        else { const gapX = S[0] + W + 15; arrow([right(...S), [gapX, S[1] + H / 2], [gapX, R1 + H + 22], [gx(N) + W / 2, R1 + H + 22], [gx(N) + W / 2, R1 + H + 6]], n('The last slice sends its boxes to the buffer, where they wait for the next cycle.') + `${p.link} gt`, false, gapX + 16, (R1 + H + 22 + S[1] + H / 2) / 2); }
       }
       output(...S);
     }
@@ -1043,11 +1043,11 @@ function flowSVG(mode, N, p) {
       const laneY = R2 + H + 64;
       for (let i = 0; i < N; i++) lane(gx(i) + 24, R2 + H, laneY);
       returnLane(gx(N - 1) + 24, laneY, LU, local
-        ? `Leftovers: a box the slice is done with goes back to the LUIF (${p.back} gt), then the buffer; a slice resets on its own when its queue is done.`
-        : `Leftovers: these cores can't take a box that might now lead with an unstackable, so a finished box can't go on to the next core. It goes back to the LUIF (${p.back} gt) and through grouper 1..N again. It can't tell which slice it came from, but it no longer holds any item it already met, so only later groupers can claim it.`);
+        ? 'Leftovers: once a slice is done with a box, the box goes back through the LUIF to the buffer. A slice resets on its own when it has no boxes left.'
+        : 'Leftovers: once a slice has taken its item out, the box might now start with something that doesn\'t stack, which the next slice couldn\'t handle. So instead of going to the next slice, it goes back through the LUIF and past all the groupers again. The groupers can\'t tell where it came from, but it can\'t contain any item it has already been through, so only later groupers will want it.');
     }
     if (local) {
-      arrow([top(gx(N - 1), R1), [gx(N - 1) + W / 2, R1 - 34], [BU[0] + W / 2, R1 - 34], [BU[0] + W / 2, R1 - 6]], n(`Boxes no grouper claims go straight back to the buffer (${p.link} gt), skipping the LUIF, and keep circling.`) + `unclaimed ${p.link} gt`, true);
+      arrow([top(gx(N - 1), R1), [gx(N - 1) + W / 2, R1 - 34], [BU[0] + W / 2, R1 - 34], [BU[0] + W / 2, R1 - 6]], n('Boxes that no grouper wants go straight back to the buffer, skip the LUIF, and keep going round.') + `unclaimed ${p.link} gt`, true);
     } else {
       arrow([right(gx(N - 1), R1), left(...BU)], `${p.link} gt`);
       arrow([top(...BU), [BU[0] + W / 2, R1 - 50], [LU[0] + W - 20, R1 - 50], [LU[0] + W - 20, R1]], n(cycleNote) + 'next cycle', true);
@@ -1057,19 +1057,19 @@ function flowSVG(mode, N, p) {
     const LU = [X0 + STEP, R1], BU = [X0 + 2 * STEP, R1], G = [X0 + 3 * STEP, R1], sx = i => X0 + 3 * STEP + i * STEP;
     arrow([right(...IN), left(...LU)], `${inNote()}${p.link} gt`);
     luifAt(...LU); box(...BU, ['Buffer', 'unpicked + returned boxes'], 'circle');
-    box(...G, [n(`Global grouper: waits until the whole cycle is in the buffer, then forms group 1, 2 … N in turn. Group k's item is the first item of the first box in the buffer (the grouper can't see which item a core may already have taken); it checks every buffer box (${p.grouper} gt each) and the matching ones go to core k.`) + 'Global grouper', `${p.grouper} gt per box`, 'once all are in'], 'diamond');
+    box(...G, [n('Global grouper: waits until the whole cycle is in the buffer, then makes group 1, group 2, … one after another. For each group it takes the first item of the first box in the buffer and gathers every box that contains it, and that group goes to the matching slice. The grouper can\'t see which item a slice may already have picked up on its own.') + 'Global grouper', `${p.grouper} gt per box`, 'once all are in'], 'diamond');
     arrow([right(...LU), left(...BU)], `${p.link} gt`); arrow([right(...BU), left(...G)], '');
     const busY = R2 - 24, laneY = R2 + H + 64;
     for (let i = 0; i < N; i++) {
       const S = [sx(i), R2];
       slice(...S, i, 'with the cycle');
-      arrow(i ? [bottom(...G), [G[0] + W / 2, busY], [S[0] + W / 2, busY], top(...S)] : [bottom(...G), top(...S)], i ? '' : n(`Group k goes to core k (${p.toSlice} gt), the box that named the item first. Core k starts on it while the grouper forms the next group.`) + `group i → slice i, ${p.toSlice} gt`, false, i ? undefined : G[0] + W / 2 + 70, i ? undefined : busY - 5);
-      if (i < N - 1 && !ret) arrow([right(...S), left(sx(i + 1), R2)], (i ? '' : n(`Core i → core i+1 (${p.hop} gt): a box core i is done with walks on through the remaining cores, never back to the grouper. Each core checks it (${check}) and unloads its own item if the box has it; a core with no item yet (its group not formed yet) takes the first item of the box that reaches it. The grouper can't see that and names each group from the first box in its buffer, so a core named early by a core-line box may get a different item than its group, and output isn't always ideal. This way a box from group 1 that also holds slice 4's item meets core 4 on the way.`)) + `${p.hop} gt`);
+      arrow(i ? [bottom(...G), [G[0] + W / 2, busY], [S[0] + W / 2, busY], top(...S)] : [bottom(...G), top(...S)], i ? '' : n('Group k goes to slice k, starting with the box its item came from. Slice k gets to work while the grouper builds the next group.') + `group i → slice i, ${p.toSlice} gt`, false, i ? undefined : G[0] + W / 2 + 70, i ? undefined : busY - 5);
+      if (i < N - 1 && !ret) arrow([right(...S), left(sx(i + 1), R2)], (i ? '' : n(`Slice i → slice i+1: once a slice is done with a box, the box visits the remaining slices one by one instead of going back to the grouper, so a box from group 1 that also contains slice 4's item still meets slice 4. Each slice checks the box (${check}) and takes out its item if it's there. A slice that doesn't have an item yet (its group isn't ready) takes the first item of whichever box reaches it. The grouper can't see that, so a slice that picked up an item early from another box may be after a different item than its group, and output isn't always ideal.`)) + `${p.hop} gt`);
       if (ret) lane(S[0] + 24, R2 + H, laneY);
       output(...S);
     }
-    if (ret) returnLane(sx(N - 1) + 24, laneY, LU, `Leftovers: these cores can't pass a box on (it might now lead with an unstackable), so it goes back through the LUIF (${p.back} gt) into the buffer. The grouper sends groups off without keeping their items, so a box that still holds a later slice's item only meets it if it's back in the buffer before that slice's group is formed; otherwise the item waits for the next cycle and output isn't always ideal.`);
-    else arrow([[sx(N - 1) + 24, R2 + H], [sx(N - 1) + 24, laneY], [BU[0] + W / 2, laneY], [BU[0] + W / 2, R1 + H + 6]], n(`The last core sends boxes back to the same buffer (${p.link} gt); they wait there for the next cycle.`) + `last core → buffer ${p.link} gt`, true, (sx(N - 1) + BU[0]) / 2 + 60, laneY - 5);
+    if (ret) returnLane(sx(N - 1) + 24, laneY, LU, 'Leftovers: once a slice has taken its item out, the box might now start with something that doesn\'t stack, so it can\'t go on to the next slice. It goes back through the LUIF into the buffer instead. The grouper doesn\'t remember the groups it already sent, so if that box still holds a later slice\'s item, it only gets there if it\'s back in the buffer before that slice\'s group is made; otherwise the item waits for the next cycle, and output isn\'t always ideal.');
+    else arrow([[sx(N - 1) + 24, R2 + H], [sx(N - 1) + 24, laneY], [BU[0] + W / 2, laneY], [BU[0] + W / 2, R1 + H + 6]], n('The last slice sends boxes back to the buffer, where they wait for the next cycle.') + `last core → buffer ${p.link} gt`, true, (sx(N - 1) + BU[0]) / 2 + 60, laneY - 5);
     arrow([top(...BU), [BU[0] + W / 2, R1 - 50], [LU[0] + 30, R1 - 50], [LU[0] + 30, R1]], n(cycleNote) + 'next cycle', true);
   } else if (ownLuM(mode)) {                        // a LUIF above every cart slice; slice i -> LUIF i+1
     const hyper = mode === 'cartH';
@@ -1077,28 +1077,28 @@ function flowSVG(mode, N, p) {
     arrow([right(...IN), left(sx(0), R1)], `${inNote()}${p.link} gt`);
     for (let i = 0; i < N; i++) {
       const LU = [sx(i), R1], S = [sx(i), R2];
-      box(...LU, [(i ? '' : n(`Every cart slice has its own LUIF (${p.luif} gt + ${p.unst} gt per leading unstackable), because these cores can't handle a leading unstackable and a front LUIF couldn't tell which slice a box came back from. The LUIF works on the next box while its slice is busy.`)) + `LUIF ${i + 1}`, `${p.luif} gt + ${p.unst} gt / unstackable`]);
+      box(...LU, [(i ? '' : n('Every slice has its own LUIF in front, because these slices can\'t handle a box that starts with an unstackable, and a single LUIF at the front wouldn\'t know which slice a box had just come from. Each LUIF can clean the next box while its slice is still busy.')) + `LUIF ${i + 1}`, `${p.luif} gt + ${p.unst} gt / unstackable`]);
       arrow([[LU[0] + W - 24, LU[1]], [LU[0] + W - 24, LU[1] - 26]], '');
       if (!i) out.push(`<text x="${LU[0] + W - 18}" y="${LU[1] - 16}" font-size="10" fill="var(--muted)">unstackables, empties</text>`);
       slice(...S, i, hyper ? 'after its cycle' : 'with the cycle');
       arrow([bottom(...LU), top(...S)], 'when free');
       const gapX = S[0] + W + 15, last = i === N - 1;
-      arrow([[S[0] + W, S[1] + H / 2], [gapX, S[1] + H / 2], [gapX, R1 + H / 2], left(last ? BU[0] : sx(i + 1), R1)], (i ? '' : n(`Slice i → LUIF i+1 (${p.pass} gt): every box goes through every slice. A slice with no item names it from the box's first item; a slice with an item spends ${check} whether the box holds it.`)) + (last ? `${p.link} gt` : `${p.pass} gt`), false, gapX + 16, (R1 + H / 2 + S[1] + H / 2) / 2);
+      arrow([[S[0] + W, S[1] + H / 2], [gapX, S[1] + H / 2], [gapX, R1 + H / 2], left(last ? BU[0] : sx(i + 1), R1)], (i ? '' : n(`Slice i → next LUIF: every box goes through every slice. A slice without an item takes the box's first item as its own; a slice that already has one needs ${check} whether the box contains it.`)) + (last ? `${p.link} gt` : `${p.pass} gt`), false, gapX + 16, (R1 + H / 2 + S[1] + H / 2) / 2);
       output(...S);
     }
     box(...BU, ['Buffer', hyper ? 'next cycle: slices 1-2 free' : 'next cycle after reset'], 'circle');
-    arrow([top(...BU), [BU[0] + W / 2, R1 - 50], [sx(0) + 30, R1 - 50], [sx(0) + 30, R1]], n(hyper ? `Hyperthreaded: cycles overlap. Each slice resets as soon as the last box of its cycle has passed it; the next cycle (exactly the boxes leaving this one) starts entering once slices 1 and 2 are free, and a box only moves into a slice when that slice and the next are free or of its own cycle, so one empty slice always separates two cycles. Output stays ideal.` : cycleNote) + (hyper ? 'cycles overlap, one empty slice between' : 'next cycle'), true);
+    arrow([top(...BU), [BU[0] + W / 2, R1 - 50], [sx(0) + 30, R1 - 50], [sx(0) + 30, R1]], n(hyper ? `Hyperthreaded: cycles overlap. A slice resets as soon as the last box of its cycle has gone past, instead of waiting for the whole line. The next cycle (exactly the boxes coming out of this one) starts going in once slices 1 and 2 are free, and a box only moves into a slice when that slice and the one after it are free or working on its own cycle, so there's always an empty slice between two cycles. Output stays ideal.` : cycleNote) + (hyper ? 'cycles overlap, one empty slice between' : 'next cycle'), true);
   } else {
     const hyper = isHyperM(mode), sx = i => X0 + STEP + i * STEP, BU = [sx(N), R1];
     arrow([right(...IN), left(sx(0), R1)], `${inNote()}${p.link} gt`);
     for (let i = 0; i < N; i++) {
       const S = [sx(i), R1];
       slice(...S, i, hyper ? 'after its cycle' : 'with the cycle');
-      arrow([right(...S), left(i < N - 1 ? sx(i + 1) : BU[0], R1)], (i ? '' : n(`Slice i → slice i+1 (${p.pass} gt): boxes walk every slice in a line. A slice with no item ${cart ? 'lets its cart take the box\'s first item' : 'strips leading unstackables (' + p.unst + ' gt each) and takes the first item'}; a slice with an item unloads it if the box holds it (${check}) and the boxes behind wait.`)) + (i < N - 1 ? `${p.pass} gt` : `${p.link} gt`));
+      arrow([right(...S), left(i < N - 1 ? sx(i + 1) : BU[0], R1)], (i ? '' : n(`Slice i → slice i+1: boxes go through the slices in a line. A slice without an item ${cart ? 'lets its cart take the box\'s first item' : 'first removes any unstackables at the front of the box, then takes the first item'} as its own. A slice that has an item takes it out if the box contains it (${check}), while the boxes behind wait.`)) + (i < N - 1 ? `${p.pass} gt` : `${p.link} gt`));
       output(...S);
     }
     box(...BU, ['Buffer', hyper ? 'next cycle: slices 1-2 free' : 'next cycle after reset'], 'circle');
-    arrow([top(...BU), [BU[0] + W / 2, R1 - 40], [sx(0) + W / 2, R1 - 40], [sx(0) + W / 2, R1]], n(hyper ? `Hyperthreaded: cycles overlap. Each slice resets as soon as the last box of its cycle has passed it; the next cycle (exactly the boxes leaving this one) starts entering once slices 1 and 2 are free, and one empty slice always separates two cycles. Output stays ideal.` : cycleNote) + (hyper ? 'cycles overlap, one empty slice between' : 'next cycle'), true);
+    arrow([top(...BU), [BU[0] + W / 2, R1 - 40], [sx(0) + W / 2, R1 - 40], [sx(0) + W / 2, R1]], n(hyper ? `Hyperthreaded: cycles overlap. A slice resets as soon as the last box of its cycle has gone past, instead of waiting for the whole line. The next cycle (exactly the boxes coming out of this one) starts going in once slices 1 and 2 are free, and there's always an empty slice between two cycles. Output stays ideal.` : cycleNote) + (hyper ? 'cycles overlap, one empty slice between' : 'next cycle'), true);
   }
   const Wd = maxX + 20, Hd = maxY + 16;
   return { notes, svg: `<svg width="${Wd}" height="${Hd}" viewBox="0 0 ${Wd} ${Hd}" role="img" aria-label="Flowchart of the ${LOGIC_NAME[mode]} logic">
