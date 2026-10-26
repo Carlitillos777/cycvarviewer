@@ -1,5 +1,5 @@
 # Publishes the browser viewer (viz/) to GitHub Pages on every push to main.
-# The site keeps the repo layout the viewer expects (viz/ next to data/sets/), and the site root redirects to viz/.
+# The viewer is served from the site root; its item sets are copied to data/sets/ beside it.
 name: Deploy viewer to GitHub Pages
 
 on:
@@ -25,11 +25,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build site
+        # the viewer sits at the site root (no /viz in the URL), with the item sets next to it in data/sets/
         run: |
           mkdir -p _site/data
-          cp -r viz _site/viz
+          cp -r viz/. _site/
           cp -r data/sets _site/data/sets
-          echo '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=viz/"><title>Cycvar Viewer</title><a href="viz/">Cycvar Viewer</a>' > _site/index.html
+          sed -i "s#'../data/sets/'#'data/sets/'#" _site/index.html
+          grep -q "'data/sets/'" _site/index.html
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
