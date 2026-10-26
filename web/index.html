@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cycvar Speed Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Roboto:wght@400;500&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --paper: #F3F5F9; --surface: #FFFFFF; --ink: #181C1F; --muted: #5B6675; --line: #DCE2EA;
+  --blue: #3B5F90; --blue-soft: rgba(59,95,144,.16); --green: #3A6939; --warn: #9A5B13; --err: #A33A2C;
+  --on-blue: #FFFFFF;
+  --head: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  --body: 'Roboto', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'Roboto Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #11151B; --surface: #192029; --ink: #E5EAF1; --muted: #98A3B3; --line: #2A3340;
+    --blue: #7FA3D6; --blue-soft: rgba(127,163,214,.20); --green: #82BE80; --warn: #E0A458; --err: #EE8A7C;
+    --on-blue: #0E141C;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #11151B; --surface: #192029; --ink: #E5EAF1; --muted: #98A3B3; --line: #2A3340;
+  --blue: #7FA3D6; --blue-soft: rgba(127,163,214,.20); --green: #82BE80; --warn: #E0A458; --err: #EE8A7C;
+  --on-blue: #0E141C;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--body); padding-inline: 16px; padding-block: 24px 48px; }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 24px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+h1 { font: 700 26px/1.2 var(--head); margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+h1 span { color: var(--blue); }
+.sub { color: var(--muted); margin: 0; font-size: 14px; }
+h2 { font: 600 13px/1.3 var(--head); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0; }
+.layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 16px; }
+aside.panel { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); }
+@media (max-width: 860px) { aside.panel { position: static; } }
+.field { display: grid; gap: 6px; }
+label, .lbl { font-size: 13px; color: var(--muted); font-weight: 500; }
+select, input[type=number] {
+  width: 100%; font: 15px var(--body); color: var(--ink); background: var(--paper); border: 1px solid var(--line);
+  border-radius: 6px; padding: 8px 10px;
+}
+input[type=number] { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+select:focus-visible, input:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.file { font-size: 13px; color: var(--muted); }
+.file input { width: 100%; font-size: 13px; color: var(--ink); }
+details { border-top: 1px solid var(--line); padding-top: 12px; }
+summary { cursor: pointer; font: 600 13px var(--head); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+details .inner { display: grid; gap: 10px; margin-top: 12px; }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--ink); }
+.check input { margin-top: 3px; }
+button.run {
+  font: 600 15px var(--head); background: var(--blue); color: var(--on-blue); border: 0; border-radius: 8px;
+  padding: 12px 16px; cursor: pointer; letter-spacing: .02em;
+}
+button.run:hover { filter: brightness(1.08); }
+button.run:disabled { opacity: .55; cursor: progress; }
+.progress { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.progress div { height: 100%; width: 0; background: var(--blue); transition: width .15s; }
+@media (prefers-reduced-motion: reduce) { .progress div { transition: none; } }
+.status { font-size: 13px; color: var(--muted); min-height: 1.5em; }
+.status.err { color: var(--err); }
+main { display: grid; gap: 24px; min-width: 0; }
+.chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.chip { background: var(--surface); padding: 12px 14px; display: grid; gap: 2px; }
+.chip b { font: 500 19px var(--mono); font-variant-numeric: tabular-nums; }
+.chip span { font-size: 12px; color: var(--muted); }
+.chartbox { display: grid; gap: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
+svg { width: 100%; height: auto; display: block; }
+svg text { font: 12px var(--mono); fill: var(--muted); }
+.tablebox { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 760px; }
+th { font: 600 12px var(--head); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { font: 14px var(--mono); text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+td.best { color: var(--blue); font-weight: 500; }
+.note { font-size: 13px; color: var(--muted); max-width: 70ch; margin: 0; }
+.note strong { color: var(--warn); font-weight: 500; }
+ul.assume { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); display: grid; gap: 4px; max-width: 80ch; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Cycvar <span>Speed Simulator</span></h1>
+      <p class="sub">Monte Carlo runs of the slice cycvar. Same mechanics as <code>model/cycvar_sim.py</code>.</p>
+    </div>
+    <p class="sub" id="tps"></p>
+  </header>
+
+  <div class="layout">
+    <aside class="panel" aria-label="Simulation settings">
+      <div class="field">
+        <label for="set">Item set</label>
+        <select id="set"></select>
+        <div class="file"><label for="upload">Add a .litematic (saved to data/sets)</label><input id="upload" type="file" accept=".litematic"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="smin">Slices from</label><input id="smin" type="number" min="1" max="64" value="2"></div>
+        <div class="field"><label for="smax">to</label><input id="smax" type="number" min="1" max="64" value="8"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="trials">Runs per slice count</label><input id="trials" type="number" min="1" max="5000" value="100"></div>
+        <div class="field"><label for="batch">Batch (boxes)</label><input id="batch" type="number" min="1" max="100000" value="54"></div>
+      </div>
+      <details>
+        <summary>Timing (game ticks)</summary>
+        <div class="inner">
+          <div class="row2">
+            <div class="field"><label for="luif">LUIF per box</label><input id="luif" type="number" min="0" step="1" value="16"></div>
+            <div class="field"><label for="unst">Per unstackable</label><input id="unst" type="number" min="0" step="1" value="8"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="cart">Cart cycle</label><input id="cart" type="number" min="0" step="1" value="70"></div>
+            <div class="field"><label for="reset">Filter reset</label><input id="reset" type="number" min="0" step="1" value="10"></div>
+          </div>
+          <div class="field"><label for="warp">Your in-game test speed (gt per real second)</label><input id="warp" type="number" min="1" step="1" value="198"></div>
+          <label class="check"><input id="cartun" type="checkbox" checked> Cart core removes unstackables from the middle of a box</label>
+          <div class="field"><label for="seed">Seed</label><input id="seed" type="number" step="1" value="0"></div>
+        </div>
+      </details>
+      <button class="run" id="run">Run simulation</button>
+      <div class="progress" aria-hidden="true"><div id="bar"></div></div>
+      <div class="status" id="status" role="status"></div>
+    </aside>
+
+    <main>
+      <section class="chips" id="chips" aria-label="Item set summary"></section>
+
+      <section class="panel chartbox">
+        <h2>Speed by slice count</h2>
+        <div id="chart"></div>
+        <div class="legend">
+          <span><i style="background:var(--blue)"></i>Average run</span>
+          <span><i style="background:var(--blue-soft)"></i>90% of single runs</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Results</h2>
+        <div class="tablebox"><table id="table" aria-label="Results per slice count"></table></div>
+        <p class="note"><strong>Timings are estimates, not yet checked against a measured run.</strong> Change them under Timing to see how much each one matters.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Model</h2>
+        <ul class="assume">
+          <li>Boxes go in as batches (54 by default). The next batch starts only when the current one is fully sorted.</li>
+          <li>Each cycle every remaining box passes the Lead Unstackable Item Filter: one LUIF step per box, plus one step per leading unstackable removed. Empty boxes leave.</li>
+          <li>An empty grouper takes the first item of the first box it sees. After that it takes every box holding that item in any slot. Unclaimed boxes go to the buffer.</li>
+          <li>Slices start only after every box has passed the groupers. Each box costs ceil(items / (stack − 1)) + 1 cart cycles; the extra empty cycle triggers the box swap.</li>
+          <li>A cycle ends when the slowest slice finishes. Partial output boxes leave at cycle end.</li>
+          <li>Randomness: input box order is shuffled per run, buffer order is shuffled per cycle (droppers).</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+const HOPPER = 9000;
+const $ = id => document.getElementById(id);
+const fmt = (v, d = 0) => v.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
+let current = null, abort = null;
+
+function setStatus(msg, err = false) { $('status').textContent = msg; $('status').classList.toggle('err', err); }
+
+async function api(path, body, headers = { 'Content-Type': 'application/json' }) {
+  const res = await fetch(path, body === undefined ? {} : { method: 'POST', headers, body: headers['Content-Type'] ? JSON.stringify(body) : body });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `server answered ${res.status}`);
+  return res;
+}
+
+async function refreshSets(select) {
+  const names = await (await api('/api/sets')).json();
+  $('set').innerHTML = names.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
+  if (!names.length) { setStatus('No item sets yet. Put .litematic files in data/sets/ or upload one.', true); return; }
+  $('set').value = names.includes(select) ? select : (names.includes('PU-03-Large') ? 'PU-03-Large' : names[0]);
+}
+
+function renderChips(sm) {
+  const chips = [
+    [fmt(sm.boxes), 'boxes'], [fmt(sm.items), 'items'], [fmt(sm.types), 'item types'],
+    [fmt(sm.unstackable_items), 'unstackable items'], [fmt(sm.ideal), 'ideal output boxes'],
+    [fmt(sm.ideal_per_batch), `ideal with batches of ${$('batch').value}`],
+  ];
+  $('chips').innerHTML = chips.map(([v, l]) => `<div class="chip"><b>${v}</b><span>${l}</span></div>`).join('');
+}
+
+async function loadSummary() {
+  current = $('set').value;
+  if (!current) return;
+  renderChips(await (await api('/api/summary', { set: current, batch: +$('batch').value })).json());
+}
+
+function hms(sec) {
+  if (sec < 90) return `${fmt(sec)} s`;
+  const m = sec / 60;
+  return m < 90 ? `${fmt(m)} min` : `${fmt(m / 60, 1)} h`;
+}
+
+function renderTable(res) {
+  const warp = Math.max(1, +$('warp').value || 198);
+  const best = Math.max(...res.map(r => r.mean));
+  const head = ['Slices', 'Speed (items/h)', '× hopper', '90% of runs', '±1σ', 'Game time', 'In-game test', 'Cycles', 'Passes / box', 'Output boxes'];
+  $('table').innerHTML = `<thead><tr>${head.map(h => `<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>` +
+    res.map(r => `<tr>
+      <td>${r.n}</td><td class="${r.mean === best ? 'best' : ''}">${fmt(r.mean)}</td><td>${fmt(r.mean / HOPPER, 2)}×</td>
+      <td>${fmt(r.lo)} – ${fmt(r.hi)}</td><td>${fmt(r.sd * 100, 1)}%</td>
+      <td>${fmt(r.gt / 72000, 2)} h</td><td>${hms(r.gt / warp)}</td>
+      <td>${fmt(r.cycles)}</td><td>${fmt(r.passes, 1)}</td><td>${fmt(r.outputs)}</td></tr>`).join('') + '</tbody>';
+}
+
+function niceStep(max, ticks) {
+  const raw = max / ticks, mag = 10 ** Math.floor(Math.log10(raw));
+  return [1, 2, 2.5, 5, 10].map(f => f * mag).find(s => s >= raw);
+}
+
+function renderChart(res) {
+  const W = 680, H = 300, L = 62, R = 56, Tp = 14, B = 36;
+  const xs = res.map(r => r.n), x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const top = Math.max(...res.map(r => r.hi)) * 1.05, step = niceStep(top, 5), yMax = Math.ceil(top / step) * step;
+  const X = n => x1 === x0 ? (L + W - R) / 2 : L + (n - x0) / (x1 - x0) * (W - L - R);
+  const Y = v => Tp + (1 - v / yMax) * (H - Tp - B);
+  let g = '';
+  for (let v = 0; v <= yMax + 1e-9; v += step) {
+    g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/>`;
+    g += `<text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end">${v >= 1000 ? fmt(v / 1000) + 'k' : fmt(v)}</text>`;
+    g += `<text x="${W - R + 8}" y="${Y(v) + 4}">${fmt(v / HOPPER, 1)}×</text>`;
+  }
+  for (const n of xs) g += `<text x="${X(n)}" y="${H - B + 20}" text-anchor="middle">${n}</text>`;
+  g += `<text x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle">slices</text>`;
+  const band = res.map(r => `${X(r.n)},${Y(r.hi)}`).concat([...res].reverse().map(r => `${X(r.n)},${Y(r.lo)}`)).join(' ');
+  g += `<polygon points="${band}" fill="var(--blue-soft)" stroke="none"/>`;
+  g += `<polyline points="${res.map(r => `${X(r.n)},${Y(r.mean)}`).join(' ')}" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linejoin="round"/>`;
+  for (const r of res) g += `<circle cx="${X(r.n)}" cy="${Y(r.mean)}" r="4" fill="var(--blue)"><title>${r.n} slices: ${fmt(r.mean)} items/h (${fmt(r.lo)}–${fmt(r.hi)})</title></circle>`;
+  $('chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Average speed by slice count with 90% range">${g}</svg>`;
+}
+
+async function runAll() {
+  if (!current) return;
+  abort?.abort();
+  abort = new AbortController();
+  const body = {
+    set: current, smin: +$('smin').value, smax: +$('smax').value, trials: +$('trials').value, batch: +$('batch').value,
+    seed: +$('seed').value, luif_gt: +$('luif').value, unstack_gt: +$('unst').value, cart_gt: +$('cart').value,
+    reset_gt: +$('reset').value, cartun: $('cartun').checked,
+  };
+  $('bar').style.width = '0';
+  setStatus(`Simulating ${current}…`);
+  try {
+    const res = await fetch('/api/simulate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: abort.signal });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `server answered ${res.status}`);
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    const results = [];
+    let buf = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += value;
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const msg = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1);
+        if (msg.progress !== undefined) $('bar').style.width = `${msg.progress * 100}%`;
+        if (msg.result) {
+          results.push(msg.result); results.sort((a, b) => a.n - b.n);
+          renderChart(results); renderTable(results);
+        }
+        if (msg.done) {
+          $('tps').textContent = `${fmt(msg.tps / 1e6, 1)} M game ticks per second simulated`;
+          setStatus(`${fmt(msg.runs)} runs of ${current} in ${fmt(msg.seconds, 1)} s.`);
+        }
+      }
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') setStatus(`Simulation failed: ${err.message}. Is server.py still running?`, true);
+  }
+}
+
+$('set').addEventListener('change', () => loadSummary().then(runAll).catch(e => setStatus(e.message, true)));
+$('batch').addEventListener('change', () => loadSummary().catch(e => setStatus(e.message, true)));
+$('run').addEventListener('click', runAll);
+$('upload').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  setStatus(`Uploading ${f.name}…`);
+  try {
+    const { name } = await (await api('/api/upload', f, { 'X-Filename': f.name })).json();
+    await refreshSets(name);
+    await loadSummary();
+    runAll();
+  } catch (err) {
+    setStatus(`Couldn't add ${f.name}: ${err.message}.`, true);
+  }
+  e.target.value = '';
+});
+
+refreshSets().then(loadSummary).then(runAll).catch(e => setStatus(`Can't reach the simulator server: ${e.message}`, true));
+</script>
+</body>
+</html>

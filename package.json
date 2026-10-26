@@ -1,0 +1,15 @@
+{
+  "name": "cycvar",
+  "private": true,
+  "description": "Cycvar speed simulator (Python engine, local web UI)",
+  "scripts": {
+    "setup": "uv venv -q .venv && uv pip install -q -p .venv numpy scipy matplotlib openpyxl litemapy",
+    "start": ".venv/bin/python web/server.py",
+    "dev": ".venv/bin/python web/server.py",
+    "test": ".venv/bin/python model/cycvar_sim.py --demo",
+    "sim": ".venv/bin/python model/cycvar_sim.py",
+    "model": "cd model && ../.venv/bin/python cycvar_model.py ../data/runs.csv",
+    "viz": ".venv/bin/python viz/prepare.py && echo \"Open http://127.0.0.1:8766/viz/\" && .venv/bin/python -c \"import http.server as h; f = h.SimpleHTTPRequestHandler.end_headers; h.SimpleHTTPRequestHandler.end_headers = lambda s: (s.send_header('Cache-Control', 'no-cache'), f(s)); h.test(h.SimpleHTTPRequestHandler, h.ThreadingHTTPServer, port=8766, bind='127.0.0.1')\"",
+    "viz:stats": "node viz/precompute.mjs"
+  }
+}

@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cycvar Viewer</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Roboto:wght@400;500&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --paper: #EEF1F5; --surface: #FFFFFF; --ink: #181C1F; --muted: #5B6675; --line: #D3DAE4;
+  --blue: #3B5F90; --green: #3A6939; --warn: #9A5B13; --err: #A33A2C; --on-blue: #FFFFFF;
+  --lane: #B7C2D1; --panel: #F7F9FC; --pick: #E0A100;
+  --head: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  --body: 'Roboto', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'Roboto Mono', ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #10141A; --surface: #18202A; --ink: #E5EAF1; --muted: #98A3B3; --line: #2A3442;
+    --blue: #7FA3D6; --green: #82BE80; --warn: #E0A458; --err: #EE8A7C; --on-blue: #0E141C;
+    --lane: #3C4A5C; --panel: #1D2632; --pick: #F2C14E;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #10141A; --surface: #18202A; --ink: #E5EAF1; --muted: #98A3B3; --line: #2A3442;
+  --blue: #7FA3D6; --green: #82BE80; --warn: #E0A458; --err: #EE8A7C; --on-blue: #0E141C;
+  --lane: #3C4A5C; --panel: #1D2632; --pick: #F2C14E;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 14px/1.5 var(--body); padding-inline: 16px; padding-block: 10px 30px; }
+.wrap { max-width: none; margin: 0 auto; display: grid; gap: 10px; }
+header { display: flex; flex-wrap: wrap; align-items: end; gap: 6px 20px; justify-content: space-between; }
+h1 { font: 700 20px/1.15 var(--head); margin: 0; letter-spacing: -.01em; }
+h1 span { color: var(--blue); }
+.sub { color: var(--muted); margin: 0; font-size: 13px; }
+h2 { font: 600 12px/1.3 var(--head); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0; }
+.toolbar { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; gap: 6px 6px; align-items: center;
+  background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(6px); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
+.brand { font: 700 15px/1 var(--head); white-space: nowrap; margin-right: 4px; height: 30px; box-sizing: border-box; padding-bottom: 2px; display: inline-flex; align-items: center; gap: 4px; }   /* lift 1 px: the ink (with the y descender) sits below Montserrat's line-box centre */
+.brand span { color: var(--blue); }
+.group { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.group.play { margin-left: auto; padding-left: 8px; border-left: 1px solid var(--line); }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 7px; padding: 0 0 0 9px; background: var(--paper); }
+.pill input, .pill select { border: 0; border-left: 1px solid var(--line); border-radius: 0 7px 7px 0; width: 38px; }
+#speed { width: 76px; }
+/* toolbar: related fields share one segmented control, every control 30px tall */
+.toolbar :is(button, .btn, select, .seg) { height: 30px; box-sizing: border-box; }
+.seg { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); overflow: hidden; }
+.flownotes { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; font-size: 12.5px; line-height: 1.5; color: var(--muted); max-width: 1200px; }
+.flownotes b { color: var(--blue); margin-right: 6px; font-weight: 600; }
+.seg:focus-within { border-color: var(--blue); }
+.seg > .fld { display: inline-flex; align-items: center; gap: 5px; padding: 0 7px; font-size: 11.5px; line-height: 1; color: var(--muted); white-space: nowrap; }
+.seg output { display: inline-flex; align-items: center; }
+/* inside a field: label and value share one line box so their text lines up */
+.seg .fld :is(input[type=number], select, output) { height: auto; line-height: 16px; font-size: 13px; padding: 0; }
+.seg > .fld { line-height: 16px; font-size: 12px; align-items: baseline; padding-top: 6px; }   /* text on one baseline */
+.seg > .fld input[type=checkbox] { align-self: center; margin-top: -6px; }
+.seg > .fld.act { align-items: center; padding-top: 0; }
+.seg > * + * { border-left: 1px solid var(--line) !important; }
+.seg select, .seg input[type=number], .seg output { border: 0; border-radius: 0; background: transparent; padding: 0; height: 100%; font: 13px var(--mono); color: var(--ink); outline: none; }
+.seg > select { padding: 0 4px 0 7px; font-family: var(--body); max-width: 210px; cursor: pointer; }
+.seg .fld select { font-family: var(--body); cursor: pointer; }
+.seg input[type=number] { width: 30px; -moz-appearance: textfield; }
+.seg input[type=number]::-webkit-inner-spin-button, .seg input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+/* up/down arrows for the slice count (native spinners hide in this compact field) */
+.spin { display: inline-flex; flex-direction: column; align-self: center; margin: -6px -4px 0 -2px; }
+.spin button { height: 12px !important; width: 16px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 9px; line-height: 12px; cursor: pointer; }
+.spin button:hover:not(:disabled) { color: var(--blue); }
+.seg input[type=checkbox] { accent-color: var(--blue); margin: 0; width: 14px; height: 14px; cursor: pointer; }
+option, optgroup { background: var(--surface); color: var(--ink); }   /* native dropdown list, readable in both themes */
+optgroup { color: var(--muted); font-weight: 600; }
+.seg > .act { color: var(--ink); font: 600 12.5px var(--head); cursor: pointer; }
+.seg > .act:hover { background: color-mix(in srgb, var(--blue) 12%, transparent); }
+.pill select { width: auto; }
+.btn { display: inline-flex; align-items: center; font: 600 13px var(--head); border-radius: 7px; padding: 5px 11px; cursor: pointer; border: 1px solid var(--line); background: var(--paper); color: var(--ink); white-space: nowrap; }
+.btn.ghost { background: transparent; }
+.btn:hover, button:hover:not(:disabled) { border-color: var(--blue); }
+details.pop { position: relative; }
+details.pop summary { list-style: none; text-transform: none; letter-spacing: 0; font: 600 13px var(--head); color: var(--ink); }
+details.pop summary::-webkit-details-marker { display: none; }
+.popbody { position: absolute; top: calc(100% + 8px); right: 0; z-index: 5; width: min(560px, 92vw); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); display: grid; gap: 8px; }
+.statusbar { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; justify-content: space-between; }
+.dock { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); padding: 0 8px; overflow-x: auto; }
+.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); padding: 9px 12px 7px; font: 600 12px var(--head); letter-spacing: .04em; white-space: nowrap; }
+.tabs button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--blue); }
+.tabs button:hover:not([aria-selected=true]) { color: var(--ink); }
+.pane { padding: 10px 12px 12px; display: grid; gap: 8px; align-content: start; }
+.pane.out { grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 1000px) { .pane.out { grid-template-columns: minmax(0, 1fr); } }
+.outleft { display: grid; gap: 10px; justify-items: center; }
+.stats.grid { display: grid; grid-template-columns: repeat(4, auto); gap: 1px; width: 100%; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.row .sp { flex: 1; }
+.f { display: grid; gap: 4px; }
+.f label { font-size: 11px; color: var(--muted); font-weight: 500; }
+.f { gap: 3px !important; }
+select, input[type=number] { font: 13px var(--body); color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; }
+input[type=number] { width: 62px; font-family: var(--mono); }
+.pill input[type=number] { width: 44px; padding-right: 2px; }
+select:disabled, input:disabled { opacity: .55; }
+button { font: 600 13px var(--head); border-radius: 7px; padding: 6px 11px; cursor: pointer; border: 1px solid var(--line); background: var(--paper); color: var(--ink); }
+button.primary { background: var(--blue); color: var(--on-blue); border-color: var(--blue); }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.stage { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; padding-block: 6px; }
+#tip { position: fixed; z-index: 2; pointer-events: none; image-rendering: pixelated; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+canvas { display: block; margin: 0 auto; image-rendering: pixelated; }
+[hidden] { display: none !important; }
+.stats { display: flex; flex-wrap: wrap; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.stat { background: var(--surface); padding: 4px 10px; display: flex; gap: 6px; align-items: baseline; flex: 1 1 auto; }
+.stats.grid .stat { display: grid; gap: 0; }
+.stat b { font: 500 13px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stat span { font-size: 11px; color: var(--muted); }
+.muted { color: var(--muted); font-size: 13px; margin: 0; }
+#flow svg { display: block; margin: 0 auto; max-width: none; }
+#flow text { font-family: Roboto, system-ui, sans-serif; }
+.chk { display: flex; gap: 8px; align-items: center; font-size: 13px; line-height: 1.25; cursor: pointer; }
+.chk small { display: block; color: var(--muted); font-size: 11px; }
+.chk input { margin: 0; accent-color: var(--blue); }
+.outtw { max-height: 300px; overflow-y: auto; }
+#outTable td:first-child { width: 30px; }
+#outTable canvas { width: 22px; height: 22px; image-rendering: auto; display: block; }
+#outTable td { padding-block: 2px; }
+td.bad { color: var(--warn); }
+td.best { color: var(--blue); font-weight: 500; }
+/* every set: one row per set, one column per logic */
+.prehead { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.prehead h3 { margin: 0; font: 700 14px var(--head); color: var(--ink); }
+.prehead .sub { font-size: 12px; }
+.segbtns { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--paper); }
+.segbtns button { height: 28px; border: 0; border-radius: 0; background: transparent; color: var(--muted); padding: 0 11px; font: 600 12px var(--head); }
+.segbtns button + button { border-left: 1px solid var(--line); }
+.segbtns button[aria-pressed=true] { background: var(--blue); color: var(--on-blue); }
+.segbtns button:hover:not([aria-pressed=true]) { color: var(--ink); }
+.segbtns.num button { padding: 0 9px; font-family: var(--mono); }
+.prepick { width: min(360px, 90vw) !important; }
+#prePick { display: grid; gap: 2px; max-height: 60vh; overflow-y: auto; }
+.pickhead { font: 700 10.5px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 8px 6px 2px; }
+#pre .kind { display: block; font: 700 9.5px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--warn); }
+#pre th.cartcol { background: color-mix(in srgb, var(--warn) 5%, var(--surface)); }
+#pre tr.grp th { font: 700 10.5px var(--head); letter-spacing: .1em; text-transform: uppercase; color: var(--blue); padding: 8px 6px 4px; border-bottom: 0; }
+#pre tr.grp th.cartcol { color: var(--warn); }
+#pre .first { border-left: 2px solid var(--line); }
+#prePick label { display: flex; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+#prePick label:hover { background: color-mix(in srgb, var(--blue) 8%, transparent); }
+#prePick input { accent-color: var(--blue); }
+#prePick small { color: var(--muted); }
+.prelegend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11.5px; color: var(--muted); align-items: center; }
+.prelegend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+#pre { border-collapse: separate; border-spacing: 0; }
+#pre th { position: sticky; top: 0; background: var(--surface); text-align: center; vertical-align: bottom; white-space: normal; text-transform: none; letter-spacing: 0; font: 600 12px var(--head); color: var(--ink); padding: 8px 6px; min-width: 116px; }
+#pre th small { display: block; font: 500 11px var(--body); color: var(--muted); margin-top: 2px; }
+#pre th.setcol, #pre td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); text-align: left; min-width: 170px; border-right: 1px solid var(--line); }
+#pre th.setcol { z-index: 2; vertical-align: bottom; }
+#pre td { text-align: center; vertical-align: top; padding: 8px 6px; white-space: normal; }
+#pre td:first-child b { display: block; font: 600 13px var(--head); color: var(--ink); }
+#pre td:first-child small { display: block; font: 11px var(--body); color: var(--muted); margin-top: 2px; }
+#pre tbody tr:hover td { background: color-mix(in srgb, var(--blue) 6%, var(--surface)); }
+#pre .sp { display: block; font: 600 15px var(--mono); color: var(--ink); }
+#pre .bar { display: block; height: 4px; margin: 5px auto 6px; width: 72px; border-radius: 2px; background: var(--line); overflow: hidden; }
+#pre .bar span { display: block; height: 100%; border-radius: 2px; background: color-mix(in srgb, var(--muted) 70%, transparent); }
+#pre .meta { display: flex; justify-content: center; gap: 6px; align-items: center; font: 11px var(--mono); color: var(--muted); white-space: nowrap; }
+#pre .tag { font: 600 10.5px var(--body); padding: 1px 6px; border-radius: 999px; }
+#pre .tag.ok { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+#pre .tag.over { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+#pre td.fast { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--blue) 55%, transparent); border-radius: 8px; }
+#pre td.fast .sp { color: var(--blue); } #pre td.fast .bar span { background: var(--blue); }
+#pre td.fastideal { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--green) 55%, transparent); border-radius: 8px; }
+#pre td.fastideal .sp { color: var(--green); } #pre td.fastideal .bar span { background: var(--green); }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.tw { overflow-x: auto; }
+th { font: 600 11px var(--head); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+tbody tr:hover td { background: color-mix(in srgb, var(--blue) 6%, transparent); }
+td { font: 13px var(--mono); text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+details summary { cursor: pointer; font: 600 12px var(--head); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.timings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
+#timings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.tgroup { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px 10px; background: var(--paper); }
+.tgroup h5 { margin: 0 0 6px; font: 700 11px var(--head); letter-spacing: .07em; text-transform: uppercase; color: var(--ink); display: flex; justify-content: space-between; gap: 8px; }
+.tgroup h5 small { font: 500 10.5px var(--body); text-transform: none; letter-spacing: 0; color: var(--muted); }
+.tgroup.off { opacity: .45; }
+.tgroup .tnote { grid-column: 1 / -1; margin: 2px 0 0; font-size: 11px; }
+.timings label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timings input { width: 100%; }
+.status { font-size: 12px; color: var(--muted); }
+.status.err { color: var(--err); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="toolbar" role="group" aria-label="Simulation setup and playback">
+    <div class="brand">Cycvar <span>Viewer</span></div>
+    <div class="group">
+      <span class="seg"><select autocomplete="off" id="set" aria-label="Item set" title="Item set"></select><label class="fld act" for="upload" title="Open a Litematica schematic">Open…</label></span><input autocomplete="off" id="upload" type="file" accept=".litematic" hidden>
+      <span class="seg"><select autocomplete="off" id="mode" aria-label="Logic" title="Logic"><optgroup label="Hopper slices"><option value="classic">Classic</option><option value="hyper">Hyperthreaded</option><option value="grouped">Classic, with groupers</option><option value="multi">Multithreaded, with groupers</option></optgroup><optgroup label="Cart slices"><option value="cartC">Classic</option><option value="cartHy">Hyperthreaded</option><option value="cartGrp">Classic, with groupers</option><option value="cartMul">Multithreaded, with groupers</option></optgroup></select><label class="fld" id="grpOpts" for="grpKind" hidden title="One global grouper for all slices, or one grouper per slice">Groupers<select autocomplete="off" id="grpKind"><option value="global">Global</option><option value="local">Local</option></select></label></span>
+      <span class="seg" title="Run setup">
+        <label class="fld" for="slices">Slices<input autocomplete="off" id="slices" type="number" min="1" max="16" value="6"><span class="spin"><button type="button" data-d="1" aria-label="More slices">▲</button><button type="button" data-d="-1" aria-label="Fewer slices">▼</button></span></label>
+        <label class="fld" for="batch">Batch<input autocomplete="off" id="batch" type="number" min="1" max="1000" value="54"></label>
+      </span>
+      <span class="seg" id="cartOpts" hidden title="Cart slices: 0-U-U-U-U carts, 1 item / gt">
+        <label class="fld" for="t_ss">Cart detection<select autocomplete="off" id="t_ss"><option value="13">SS13</option><option value="14">SS14</option><option value="15" selected>SS15</option></select></label>
+        <label class="fld" id="unstWrap" for="unstH" title="Cart cores remove leading unstackables themselves (a whole cart cycle each); off: a LUIF does it">Unst. handling<input autocomplete="off" id="unstH" type="checkbox" checked></label>
+        <label class="fld" for="t_cartGap" title="Time between carts with no cart pulling">Gap (no pulling)<input autocomplete="off" id="t_cartGap" type="number" min="0" value="8"></label>
+        <span class="fld" title="Time a cart stays under a box that still has a stack to give: the gt it needs to reach the detection SS (1 item / gt), at least the min time under box (Options)">Under box<output id="underBox"></output></span>
+      </span>
+      <details class="pop">
+        <summary class="btn ghost" title="Grouping option and timings">Options ▾</summary>
+        <div class="popbody">
+          <label class="chk" id="waitWrap" for="waitSlice"><input autocomplete="off" type="checkbox" id="waitSlice"><span>Group only when a slice is free<small>multithreaded: waits for leftover boxes to return</small></span></label>
+          <p class="muted">Timings in game ticks. Changes apply on Load; dimmed groups aren't used by the chosen logic.</p>
+          <div class="timings" id="timings"></div>
+        </div>
+      </details>
+      <button id="reset">Load</button>
+    </div>
+    <div class="group play">
+      <button id="play" class="primary">Play</button>
+      <button id="step" title="Advance one game tick">+1 gt</button>
+      <select autocomplete="off" id="speed" aria-label="Speed" title="Speed">
+        <option value="20">1×</option><option value="40">2×</option><option value="100">5×</option>
+        <option value="200" selected>10×</option><option value="400">20×</option><option value="1000">50×</option>
+        <option value="2000">100×</option><option value="4000">200×</option><option value="20000">1000×</option>
+      </select>
+      <button id="end">Run to end</button>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <div class="status" id="status" role="status"></div>
+    <section class="stats" id="stats" aria-label="Live counters"></section>
+  </div>
+
+  <canvas id="tip" hidden aria-hidden="true"></canvas>
+  <div class="stage"><canvas id="cv" aria-label="Animated view of the cycvar: input chest, LUIF, buffer and grouper, waiting groups, slices and output"></canvas></div>
+
+  <div class="dock">
+    <nav class="tabs" role="tablist" aria-label="Details">
+      <button role="tab" data-pane="secOut" aria-selected="true">Output</button>
+      <button role="tab" data-pane="secFlow">Flowchart</button>
+      <button role="tab" data-pane="secRuns">Finished runs</button>
+      <button role="tab" data-pane="secCmp">Compare logics</button>
+    </nav>
+
+    <section class="pane out" id="secOut" role="tabpanel">
+      <div class="outleft">
+        <div class="stats grid" id="outStats"></div>
+        <div class="tw"><canvas id="outCv" aria-label="Output chests with every finished output box"></canvas></div>
+      </div>
+      <div class="outright">
+        <p class="muted" id="outNote"></p>
+        <div class="tw outtw"><table id="outTable"><thead><tr><th>Item</th><th></th><th>Items</th><th>Full</th><th>Partial</th><th>Ideal</th><th>Ideal / batch</th><th>Extra</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="pane" id="secFlow" role="tabpanel" hidden>
+      <p class="muted" id="flowTitle">Flowchart</p>
+      <div class="tw" id="flow"></div>
+      <ol class="flownotes" id="flowNotes"></ol>
+    </section>
+
+    <section class="pane" id="secRuns" role="tabpanel" hidden>
+      <div class="tw"><table id="runs"><thead><tr><th>Set</th><th>Logic</th><th>Slices</th><th>Speed</th><th>× hopper</th><th>Output boxes</th><th>Ideal / batch</th><th>Extra</th></tr></thead><tbody></tbody></table></div>
+      <p class="muted" id="runsHint">Finish a run (Play or Run to end) and it lands here.</p>
+    </section>
+
+    <section class="pane" id="secCmp" role="tabpanel" hidden>
+      <div class="row"><span class="muted" id="cmpTitle">All logics compared</span><span class="sp"></span><span class="muted" id="cmpStatus"></span><button id="cmpRun">Compare all logics</button></div>
+      <div class="tw"><table id="cmp"><thead><tr><th>Logic</th><th></th><th>Speed (items/h)</th><th>× hopper</th><th>Game time</th><th>Output boxes</th><th>Full / partial</th><th>Ideal / batch</th><th>Extra</th></tr></thead><tbody></tbody></table></div>
+      <p class="muted">Current slices, batch and timings, averaged over 3 input orders.</p>
+    </section>
+
+  </div>
+
+  <div class="dock">
+    <section class="pane" id="secPre" aria-label="Every set">
+      <div class="prehead">
+        <div><h3>Every set</h3><span class="muted sub">Precomputed, default timings · speed in × hopper</span></div>
+        <span class="sp" style="flex:1"></span>
+        <div class="segbtns" id="preKind" role="group" aria-label="Slice type"><button data-v="hopper">Hopper slices</button><button data-v="cart">Cart slices</button></div>
+        <div class="segbtns" id="preSS" role="group" aria-label="Cart detection level" title="Cart detection level for the cart columns"><button data-v="13">SS13</button><button data-v="14">SS14</button><button data-v="15">SS15</button><button data-v="all">All SS</button></div>
+        <div class="segbtns num" id="preN" role="group" aria-label="Slice count"></div>
+        <details class="pop" id="preLogics"><summary class="btn ghost" title="Choose which logics the table shows">Logics ▾</summary>
+          <div class="popbody prepick"><div class="segbtns"><button type="button" data-pick="all">All</button><button type="button" data-pick="none">None</button></div><div id="prePick"></div></div>
+        </details>
+      </div>
+      <div class="prelegend"><span><i style="background:var(--blue)"></i>fastest</span><span><i style="background:var(--green)"></i>fastest with ideal output</span><span><b class="tag ok" style="font-size:10.5px;padding:1px 6px;border-radius:999px;color:var(--green);background:color-mix(in srgb, var(--green) 14%, transparent)">ideal</b> output boxes = batch ideal</span><span><b style="font-size:10.5px;padding:1px 6px;border-radius:999px;color:var(--warn);background:color-mix(in srgb, var(--warn) 14%, transparent)">+12%</b> extra output boxes</span><span>bar = speed against the row's fastest</span></div>
+      <div class="tw"><table id="pre"><thead></thead><tbody></tbody></table></div>
+      <p class="muted" id="preNote">Loading precomputed results…</p>
+    </section>
+  </div>
+</div>
+
+<script src="sim.js"></script>
+<script>
+// ---------------------------------------------------------------- textures (from your own client jar, see prepare.py)
+let MANIFEST = { item: new Set(), block: new Set() };
+const tex = new Map();          // id -> { img, color, path }
+function hashColor(s) {
+  let h = 0;
+  for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `hsl(${h % 360} 45% 45%)`;
+}
+// items whose inventory icon is a 3D model with no flat texture of the same name
+const TEX_ALIAS = {
+  sticky_piston: 'block/piston_top_sticky', piston: 'block/piston_top', chain: 'item/iron_chain', crossbow: 'item/crossbow_standby',
+  scute: 'item/turtle_scute', enchanted_golden_apple: 'item/golden_apple', tipped_arrow: 'item/arrow',
+  heavy_weighted_pressure_plate: 'block/iron_block', light_weighted_pressure_plate: 'block/gold_block',
+  chest: 'block/oak_planks', trapped_chest: 'block/oak_planks', ender_chest: 'block/obsidian',
+};
+function texPath(id) {
+  const n = short(id);
+  const c = [TEX_ALIAS[n] || '', 'item/' + n, 'item/' + n + '_00', 'block/' + n, 'block/' + n + '_side', 'block/' + n + '_top', 'block/' + n + '_front'];
+  let base = n;
+  for (const s of ['_slab', '_stairs', '_wall', '_fence_gate', '_fence', '_pressure_plate', '_button', '_carpet', '_bed', '_banner'])
+    if (n.endsWith(s)) { base = n.slice(0, -s.length); break; }
+  if (base !== n) c.push('block/' + base, 'block/' + base + 's', 'block/' + base + '_planks', 'block/' + base + '_block', 'block/' + base + '_wool');
+  const m = base.replace(/^waxed_/, '').replace(/^smooth_/, '').replace('_wood', '_log').replace('_hyphae', '_stem').replace(/_block$/, '');
+  c.push('block/' + m, 'block/' + m + '_top', 'block/' + m + '_block_side', 'block/' + m + '_block', 'block/' + m + 's');
+  return c.find(p => { const [k, v] = p.split('/'); return MANIFEST[k]?.has(v); }) || null;
+}
+let redrawQueued = false;
+function queueRedraw() {               // repaint once after textures arrive, also while paused
+  if (redrawQueued) return;
+  redrawQueued = true;
+  requestAnimationFrame(() => { redrawQueued = false; if (typeof S !== 'undefined' && S && L) { draw(S); renderOutput(true); } });
+}
+function texOf(id) {
+  let t = tex.get(id);
+  if (t) return t;
+  t = { img: null, color: hashColor(short(id)), path: texPath(id) };
+  tex.set(id, t);
+  if (t.path) {
+    const img = new Image();
+    img.onload = () => {
+      t.img = img;
+      try {                                   // average colour for the tiny boxes
+        const c = document.createElement('canvas'); c.width = c.height = 1;
+        const x = c.getContext('2d'); x.drawImage(img, 0, 0, img.width, img.width, 0, 0, 1, 1);
+        const d = x.getImageData(0, 0, 1, 1).data;
+        if (d[3] > 0) t.color = `rgb(${d[0]},${d[1]},${d[2]})`;
+      } catch (e) { /* keep hash colour */ }
+      queueRedraw();
+    };
+    img.src = `textures/${t.path}.png`;
+  }
+  return t;
+}
+
+// ---------------------------------------------------------------- 3D inventory icons, built from the game's item + block models (prepare.py)
+let ICONS = {};
+const RES = 64;                                       // icon canvas size (4 px per GUI pixel)
+const texImgs = new Map(), iconCache = new Map(), shadeCache = new Map();
+function loadTex(path) {
+  let e = texImgs.get(path);
+  if (!e) {
+    e = { img: new Image(), ok: false, fail: false };
+    e.img.onload = () => { e.ok = true; queueRedraw(); };
+    e.img.onerror = () => { e.fail = true; queueRedraw(); };
+    e.img.src = `textures/${path}.png`;
+    texImgs.set(path, e);
+  }
+  return e;
+}
+function specTextures(spec) {
+  if (spec.flat) return spec.flat;
+  if (spec.cube) return [spec.cube];
+  return spec.els.flatMap(e => Object.values(e.faces).map(f => f.t));
+}
+// texture (first animation frame) x tint colour x face light, cached
+function shaded(path, color, light) {
+  const key = `${path}|${color}|${light}`;
+  let c = shadeCache.get(key);
+  if (c) return c;
+  const img = texImgs.get(path).img, w = img.width;
+  c = document.createElement('canvas'); c.width = c.height = w;
+  const x = c.getContext('2d');
+  x.drawImage(img, 0, 0, w, w, 0, 0, w, w);
+  const mul = color == null ? [255, 255, 255] : [(color >> 16) & 255, (color >> 8) & 255, color & 255];
+  if (color != null || light < 1) {
+    x.globalCompositeOperation = 'multiply';
+    x.fillStyle = `rgb(${mul[0] * light | 0},${mul[1] * light | 0},${mul[2] * light | 0})`;
+    x.fillRect(0, 0, w, w);
+    x.globalCompositeOperation = 'destination-in';
+    x.drawImage(img, 0, 0, w, w, 0, 0, w, w);
+  }
+  shadeCache.set(key, c);
+  return c;
+}
+const LIGHT = { up: 1, down: 0.5, north: 0.8, south: 0.8, east: 0.6, west: 0.6 };
+const NORMAL = { up: [0, 1, 0], down: [0, -1, 0], north: [0, 0, -1], south: [0, 0, 1], west: [-1, 0, 0], east: [1, 0, 0] };
+function corners(d, [x1, y1, z1], [x2, y2, z2]) {    // top-left, top-right, bottom-right, bottom-left in texture space
+  switch (d) {
+    case 'up': return [[x1, y2, z1], [x2, y2, z1], [x2, y2, z2], [x1, y2, z2]];
+    case 'down': return [[x1, y1, z2], [x2, y1, z2], [x2, y1, z1], [x1, y1, z1]];
+    case 'north': return [[x2, y2, z1], [x1, y2, z1], [x1, y1, z1], [x2, y1, z1]];
+    case 'south': return [[x1, y2, z2], [x2, y2, z2], [x2, y1, z2], [x1, y1, z2]];
+    case 'west': return [[x1, y2, z1], [x1, y2, z2], [x1, y1, z2], [x1, y1, z1]];
+    default: return [[x2, y2, z2], [x2, y2, z1], [x2, y1, z1], [x2, y1, z2]];   // east
+  }
+}
+function defaultUV(d, [x1, y1, z1], [x2, y2, z2]) {
+  switch (d) {
+    case 'up': return [x1, z1, x2, z2];
+    case 'down': return [x1, 16 - z2, x2, 16 - z1];
+    case 'north': return [16 - x2, 16 - y2, 16 - x1, 16 - y1];
+    case 'south': return [x1, 16 - y2, x2, 16 - y1];
+    case 'west': return [z1, 16 - y2, z2, 16 - y1];
+    default: return [16 - z2, 16 - y2, 16 - z1, 16 - y1];
+  }
+}
+function rotAxis(p, axis, deg, o = [0, 0, 0]) {
+  const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  let [x, y, z] = [p[0] - o[0], p[1] - o[1], p[2] - o[2]];
+  if (axis === 'x') [y, z] = [y * c - z * s, y * s + z * c];
+  else if (axis === 'y') [x, z] = [x * c + z * s, -x * s + z * c];
+  else [x, y] = [x * c - y * s, x * s + y * c];
+  return [x + o[0], y + o[1], z + o[2]];
+}
+function renderIcon(spec) {
+  const c = document.createElement('canvas'); c.width = c.height = RES;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  g.scale(RES / 16, RES / 16);
+  if (spec.flat) {
+    spec.flat.forEach((p, i) => g.drawImage(shaded(p, spec.c?.[i] ?? null, 1), 0, 0, 16, 16));
+    return c;
+  }
+  const els = spec.cube
+    ? [{ f: [0, 0, 0], t: [16, 16, 16], faces: Object.fromEntries(Object.keys(LIGHT).map(d => [d, { t: spec.cube, r: 0 }])) }]
+    : spec.els;
+  const gui = spec.gui || { rotation: [30, 225, 0], scale: [0.625, 0.625, 0.625] };
+  const [rx, ry, rz] = gui.rotation || [0, 0, 0], [sx, sy, sz] = gui.scale || [1, 1, 1], [tx, ty, tz] = gui.translation || [0, 0, 0];
+  const view = p => {             // model space (0..16) -> GUI: scale, rotate Z, Y, X, translate
+    let q = [(p[0] - 8) * sx, (p[1] - 8) * sy, (p[2] - 8) * sz];
+    q = rotAxis(rotAxis(rotAxis(q, 'z', rz), 'y', ry), 'x', rx);
+    return [8 + q[0] + tx, 8 - q[1] - ty, q[2] + tz];
+  };
+  const quads = [];
+  for (const e of els) {
+    for (const [d, f] of Object.entries(e.faces)) {
+      let pts = corners(d, e.f, e.t), n = NORMAL[d];
+      if (e.rot) { pts = pts.map(p => rotAxis(p, e.rot.axis, e.rot.angle, e.rot.origin)); n = rotAxis(n, e.rot.axis, e.rot.angle); }
+      const nv = rotAxis(rotAxis(rotAxis(n, 'z', rz), 'y', ry), 'x', rx);
+      if (nv[2] <= 1e-6 && (rx || ry)) continue;              // facing away from the viewer
+      const sp = pts.map(view);
+      quads.push({ sp, depth: sp.reduce((a, p) => a + p[2], 0) / 4, f, d, uv: f.uv || defaultUV(d, e.f, e.t) });
+    }
+  }
+  quads.sort((a, b) => a.depth - b.depth);
+  for (const q of quads) {
+    const tex = shaded(q.f.t, q.f.c ?? null, rx || ry ? LIGHT[q.d] : 1), w = tex.width / 16;
+    const [u1, v1, u2, v2] = q.uv, uvc = [[u1, v1], [u2, v1], [u2, v2], [u1, v2]], k = ((q.f.r || 0) / 90) & 3;
+    const uv = i => uvc[(i - k + 4) % 4].map(t => t * w);
+    const [a, b, cc] = [uv(0), uv(1), uv(3)], [A, B, C] = [q.sp[0], q.sp[1], q.sp[3]];
+    const du1 = [b[0] - a[0], b[1] - a[1]], du2 = [cc[0] - a[0], cc[1] - a[1]];
+    const det = du1[0] * du2[1] - du2[0] * du1[1];
+    if (Math.abs(det) < 1e-9) continue;
+    const i11 = du2[1] / det, i12 = -du2[0] / det, i21 = -du1[1] / det, i22 = du1[0] / det;
+    const d1 = [B[0] - A[0], B[1] - A[1]], d2 = [C[0] - A[0], C[1] - A[1]];
+    const m11 = d1[0] * i11 + d2[0] * i21, m12 = d1[0] * i12 + d2[0] * i22, m21 = d1[1] * i11 + d2[1] * i21, m22 = d1[1] * i12 + d2[1] * i22;
+    g.save();
+    g.beginPath(); q.sp.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.clip();
+    g.transform(m11, m21, m12, m22, A[0] - m11 * a[0] - m12 * a[1], A[1] - m21 * a[0] - m22 * a[1]);
+    g.drawImage(tex, 0, 0);
+    g.restore();
+  }
+  return c;
+}
+function iconOf(id) {
+  const n = short(id);
+  if (iconCache.has(n)) return iconCache.get(n);
+  const spec = ICONS[n];
+  if (!spec) { iconCache.set(n, null); return null; }
+  const ents = specTextures(spec).map(loadTex);
+  if (ents.some(e => !e.ok && !e.fail)) return null;          // textures still loading
+  let c = null;
+  try { if (ents.every(e => e.ok)) c = renderIcon(spec); } catch (e) { c = null; }
+  iconCache.set(n, c);
+  return c;
+}
+
+// ---------------------------------------------------------------- drawing (Minecraft GUI look; 1 unit = 1 GUI pixel)
+const cv = document.getElementById('cv');
+let ctx = cv.getContext('2d');
+let L = null, hits = [], selected = null, colors = {}, zoom = 1;
+const BOXC = '#8E5F8E';
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ['ink', 'muted', 'line', 'lane', 'panel', 'blue', 'green', 'warn', 'pick', 'surface']) colors[k] = cs.getPropertyValue('--' + k).trim();
+}
+
+// GUI textures + the game's bitmap font, all copied from the client jar by prepare.py
+const IMG = {};
+const FONT = { w: new Array(256).fill(6), img: null, tint: {}, runs: [] };
+function loadImg(k, src) {
+  const i = new Image();
+  i.onload = () => { IMG[k] = i; if (k === 'font') buildFont(i); if (S) draw(S); };
+  i.src = src;
+}
+loadImg('shulker', 'textures/gui/container/shulker_box.png');
+loadImg('chest', 'textures/gui/container/generic_54.png');
+loadImg('font', 'textures/font/ascii.png');
+loadImg('box', 'textures/block/shulker_box.png');
+function buildFont(img) {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+  const d = x.getImageData(0, 0, 128, 128).data;
+  for (let ch = 0; ch < 256; ch++) {
+    const cx = (ch % 16) * 8, cy = Math.floor(ch / 16) * 8;
+    let w = 0;
+    const runs = FONT.runs[ch] = [];            // [row, from col, to col): horizontal pixel runs of the glyph
+    for (let row = 0; row < 8; row++) for (let col = 0; col < 8; col++) {
+      if (!(d[((cy + row) * 128 + cx + col) * 4 + 3] > 0)) continue;
+      const last = runs[runs.length - 1];
+      if (last && last[0] === row && last[2] === col) last[2]++; else runs.push([row, col, col + 1]);
+      w = Math.max(w, col + 1);
+    }
+    FONT.w[ch] = ch === 32 ? 4 : w + 1;
+  }
+  FONT.img = img;
+}
+function tinted(color) {
+  if (!FONT.tint[color]) {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const x = c.getContext('2d'); x.drawImage(FONT.img, 0, 0);
+    x.globalCompositeOperation = 'source-in'; x.fillStyle = color; x.fillRect(0, 0, 128, 128);
+    FONT.tint[color] = c;
+  }
+  return FONT.tint[color];
+}
+function mcWidth(s) { let w = 0; for (const ch of s) w += FONT.w[ch.charCodeAt(0) & 255]; return w - 1; }
+function mcText(s, x, y, color, shadow) {
+  if (!FONT.img) { ctx.font = '8px monospace'; ctx.textAlign = 'left'; ctx.fillStyle = color; ctx.fillText(s, x, y + 7); return; }
+  const m = ctx.getTransform();
+  if (Math.abs(m.a - Math.round(m.a)) < 1e-6) {    // whole-pixel scale: blit the glyphs
+    const run = (img, ox) => { let cx = x; for (const ch of s) { const c = ch.charCodeAt(0) & 255; ctx.drawImage(img, (c % 16) * 8, Math.floor(c / 16) * 8, 8, 8, cx + ox, y + ox, 8, 8); cx += FONT.w[c]; } };
+    if (shadow) run(tinted(shadow), 1);
+    run(tinted(color), 0);
+    return;
+  }
+  // fractional scale: paint each font pixel snapped to the screen grid, so it stays sharp instead of smeared
+  const X = v => Math.round(m.e + v * m.a), Y = v => Math.round(m.f + v * m.d);
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const run = (col, o) => {
+    ctx.fillStyle = col;
+    let cx = x + o;
+    for (const ch of s) {
+      const c = ch.charCodeAt(0) & 255;
+      for (const [row, a, b] of FONT.runs[c]) { const x0 = X(cx + a), y0 = Y(y + o + row); ctx.fillRect(x0, y0, X(cx + b) - x0, Y(y + o + row + 1) - y0); }
+      cx += FONT.w[c];
+    }
+  };
+  if (shadow) run(shadow, 1);
+  run(color, 0);
+  ctx.restore();
+}
+function text(s, x, y, o = {}) {
+  ctx.font = o.font || '11px Roboto, system-ui, sans-serif';
+  ctx.fillStyle = o.color || colors.ink;
+  ctx.textAlign = o.align || 'left';
+  ctx.fillText(s, x, y);
+}
+function icon(id, x, y, s) {
+  const ic = iconOf(id);
+  if (ic) { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(ic, x, y, s, s); ctx.imageSmoothingEnabled = false; return; }
+  const t = texOf(id);
+  if (t.img) ctx.drawImage(t.img, 0, 0, t.img.width, t.img.width, x, y, s, s);
+  else { ctx.fillStyle = t.color; ctx.fillRect(x + 1, y + 1, s - 2, s - 2); }
+}
+function itemAt(id, count, sx, sy) {
+  icon(id, sx, sy, 16);
+  if (count > 1) { const t = String(count); mcText(t, sx + 17 - mcWidth(t), sy + 9, '#FFFFFF', '#3F3F3F'); }
+}
+function slotBg(sx, sy) {           // one inventory slot (18 x 18 including its bevel)
+  ctx.fillStyle = '#373737'; ctx.fillRect(sx - 1, sy - 1, 17, 1); ctx.fillRect(sx - 1, sy - 1, 1, 17);
+  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(sx, sy + 16, 17, 1); ctx.fillRect(sx + 16, sy, 1, 17);
+  ctx.fillStyle = '#8B8B8B'; ctx.fillRect(sx, sy, 16, 16);
+}
+function frameBg(x, y, w, h) {       // plain Minecraft window when the GUI texture is missing
+  ctx.fillStyle = '#C6C6C6'; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y, w - 1, 1); ctx.fillRect(x, y, 1, h - 1);
+  ctx.fillStyle = '#555555'; ctx.fillRect(x + 1, y + h - 1, w - 1, 1); ctx.fillRect(x + w - 1, y + 1, 1, h - 1);
+}
+const slotXY = (x, y, k) => [x + 8 + (k % 9) * 18, y + 18 + Math.floor(k / 9) * 18];
+const SHULKER_H = 76;
+
+// a shulker box screen: title + 27 slots with item counts
+function shulkerGui(x, y, title, b, opt = {}) {
+  if (IMG.shulker) { ctx.drawImage(IMG.shulker, 0, 0, 176, 72, x, y, 176, 72); ctx.drawImage(IMG.shulker, 0, 162, 176, 4, x, y + 72, 176, 4); }
+  else { frameBg(x, y, 176, SHULKER_H); for (let k = 0; k < 27; k++) slotBg(...slotXY(x, y, k)); }
+  mcText(title, x + 8, y + 6, '#404040');
+  const slots = b ? b.slots : opt.slots;
+  if (slots) for (let k = 0; k < 27; k++) {
+    const s = slots[k];
+    if (s) { const [sx, sy] = slotXY(x, y, k); itemAt(s[0], s[1], sx, sy); }
+  }
+  if (b) hit(b, x, y, 176, SHULKER_H);
+  return SHULKER_H;
+}
+// a chest screen with `rows` rows of shulker boxes; each box shows the item it leads with
+function chestGui(x, y, title, boxes, rows) {
+  const h = 17 + rows * 18;
+  if (IMG.chest) { ctx.drawImage(IMG.chest, 0, 0, 176, h, x, y, 176, h); ctx.drawImage(IMG.chest, 0, 218, 176, 4, x, y + h, 176, 4); }
+  else { frameBg(x, y, 176, h + 4); for (let k = 0; k < rows * 9; k++) slotBg(...slotXY(x, y, k)); }
+  mcText(title, x + 8, y + 6, '#404040');
+  boxes.slice(0, rows * 9).forEach((b, k) => boxIcon(b, ...slotXY(x, y, k)));
+  return h + 4;
+}
+function boxIcon(b, sx, sy) {
+  if (IMG.box) ctx.drawImage(IMG.box, 0, 0, 16, 16, sx, sy, 16, 16);
+  else { ctx.fillStyle = BOXC; ctx.fillRect(sx + 1, sy + 1, 14, 14); }
+  const f = firstItem(b);
+  if (f) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(sx + 6, sy + 6, 10, 10); icon(f, sx + 7, sy + 7, 9); }
+  hit(b, sx, sy, 16, 16);
+}
+function slotRow(boxes, x, y, n) {   // a strip of slots holding shulker boxes
+  for (let k = 0; k < n; k++) { slotBg(x + 1 + k * 18, y + 1); if (boxes[k]) boxIcon(boxes[k], x + 1 + k * 18, y + 1); }
+  if (boxes.length > n) mcText(`+${boxes.length - n}`, x + n * 18 + 4, y + 6, colors.muted);
+}
+function hit(b, x, y, w, h) {
+  hits.push({ b, x, y, w, h });
+  if (selected && b.id === selected.id) { ctx.strokeStyle = colors.pick; ctx.lineWidth = 2; ctx.strokeRect(x - 1, y - 1, w + 2, h + 2); }
+}
+function panel(x, y, w, h, title) {
+  ctx.fillStyle = colors.panel; ctx.strokeStyle = colors.line; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(x + .5, y + .5, w, h, 6); ctx.fill(); ctx.stroke();
+  if (title) text(title, x + 8, y + 15, { font: '600 10px Montserrat, system-ui, sans-serif', color: colors.muted });
+}
+function line(pts, color, w = 1.5, dash = []) {
+  ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash(dash);
+  ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.setLineDash([]);
+}
+function pathAt(pts, f) {
+  let len = 0; const seg = [];
+  for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); len += d; }
+  let r = f * len;
+  for (let i = 0; i < seg.length; i++) {
+    if (r <= seg[i]) { const t = seg[i] ? r / seg[i] : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+    r -= seg[i];
+  }
+  return pts[pts.length - 1];
+}
+
+// Front end in two columns on the left (input chest + output | LUIF, buffer, grouper, ready group);
+// all slices side by side in one row on the right.
+// Carlos's order for the test sets (menu and Every set table); sets not listed keep alphabetical order after these
+const SET_ORDER = ['WaveProject1', 'WaveProject5', 'Quarry', 'SciMushroom', 'Hermit1', 'Hermit2', 'EasyTest', 'PU-03-Small', 'PU-03-Large'];
+const setRank = name => { const i = SET_ORDER.findIndex(k => name.startsWith(k)); return i < 0 ? SET_ORDER.length : i; };
+const bySetOrder = (a, b) => setRank(a) - setRank(b) || a.localeCompare(b);
+// logic families (cart variants share the hopper logic's layout and flowchart)
+const LOCALG = ['grouped', 'local', 'cartG', 'cartGU', 'cartML'];         // one grouper per slice
+const WALK = ['classic', 'cart', 'cartU', 'hyper', 'cartH', 'cartHU'];    // boxes walk slice 1 -> N
+const GLOBALG = ['multi', 'cgg', 'cartMG', 'cartGG', 'cartGGo'];           // one global grouper
+const isLocalM = m => m === 'local' || m === 'cartML', isHyperM = m => m === 'hyper' || m === 'cartH' || m === 'cartHU';
+const ownLuM = m => m === 'cart' || m === 'cartH', cggM = m => m === 'cgg' || m === 'cartGG' || m === 'cartGGo';
+function layout(N, mode) {
+  const rows = 1;
+  // local-grouper logics draw each slice's grouper GUI at the top of its column, pushing the rest down by `off`
+  const off = LOCALG.includes(mode) ? 64 : 0;
+  const top = 10, chestH = 17 + 6 * 18 + 4, colW = 188, cellH = 264 + off;
+  const l = { top, chestH, colW, cellH, off, solid: [] };
+  const A = 10, B = 202;
+  l.input = { x: A, y: top };
+  l.luif = { x: B, y: top };
+  l.paths = { in: [[A + 176, top + 40], [B, top + 40]] };
+  l.buffer = { x: B, y: l.luif.y + SHULKER_H + 38 };
+  l.grouper = { x: B, y: l.buffer.y + chestH + 14 };
+  l.waiting = { x: B, y: l.grouper.y + SHULKER_H + 10, w: 176, h: 44 };
+  const m = B + 88;
+  l.paths.buf = [[m, l.luif.y + SHULKER_H + 22], [m, l.buffer.y]];
+  l.solid.push([[m, l.buffer.y + chestH], [m, l.grouper.y]], [[m, l.grouper.y + SHULKER_H], [m, l.waiting.y]]);
+  let leftH = l.waiting.y + l.waiting.h;
+  const walk = WALK.includes(mode);
+  if (walk) {                           // classic and hyperthreaded: input chest and buffer only; boxes walk slice 1 -> N -> buffer
+    l.buffer = { x: B, y: top };
+    l.solid = [];
+    leftH = top + chestH + 20;
+  } else if (LOCALG.includes(mode)) {   // local groupers: LUIF above the buffer, one grouper per slice
+    l.solid = [];
+    leftH = l.buffer.y + chestH + 10;
+  }
+  const busX = B + 192, backX = B + 184, sx = B + 206;
+  Object.assign(l, { busX, backX, sx, rows, cols: Math.ceil(N / rows) });
+  l.H = Math.max(leftH, rows * cellH) + 10;
+  l.W = sx + l.cols * colW;
+  l.slice = i => ({ x: sx + (i % l.cols) * colW, y: top + Math.floor(i / l.cols) * cellH + 20, row: Math.floor(i / l.cols) });
+  l.exit = walk ? [B + 176, top + 40] : ['grouped', 'cartG', 'cartGU'].includes(mode) ? [B + 176, l.luif.y + 20] : isLocalM(mode) ? [B + 176, l.buffer.y + 30] : [B + 176, l.waiting.y + 20];
+  l.entry = walk ? [B + 176, top + 100] : mode === 'grouped' || mode === 'cartGU' ? [B + 176, l.buffer.y + 70] : [B + 176, l.luif.y + 38];
+  for (let i = 0; i < N; i++) {
+    const s = l.slice(i), cx = s.x + 88, busY = s.y - 14, laneY = s.y + 238 + off;
+    l.paths['to' + i] = [l.exit, [busX, l.exit[1]], [busX, busY], [cx, busY], [cx, s.y - 6]];
+    l.paths['back' + i] = [[cx, s.y + 226 + off], [cx, laneY], [backX, laneY], [backX, l.entry[1]], l.entry];
+  }
+  if (LOCALG.includes(mode)) {
+    const s0 = l.slice(0), busY = s0.y - 14;
+    l.paths.g = [l.exit, [busX, l.exit[1]], [busX, busY], [s0.x + 88, busY], [s0.x + 88, s0.y - 6]];
+    for (let i = 0; i < N - 1; i++) {            // grouper i -> grouper i+1 (and slice i -> grouper i+1)
+      const a = l.slice(i).x + 88, b = l.slice(i + 1).x + 88;
+      l.paths['hop' + i] = [[a, busY], [b, busY], [b, s0.y - 6]];
+    }
+    const sN = l.slice(N - 1), laneY = sN.y + 238 + off, bufIn = [B + 176, l.buffer.y + 90];
+    l.paths.last = [[sN.x + 88, sN.y + 226 + off], [sN.x + 88, laneY], [backX, laneY], [backX, bufIn[1]], bufIn];
+    for (let i = 0; i < N; i++) {                // grouper i -> core i (every local-grouper logic)
+      const s = l.slice(i), cx = s.x + 88;
+      l.paths['down' + i] = [[cx, s.y + 90], [cx, s.y + 98]];   // grouper GUI -> core queue row
+    }
+    if (!isLocalM(mode)) {
+      l.paths.rebuf = [[m, l.buffer.y], [m, l.luif.y + SHULKER_H + 22]]; delete l.paths.buf;
+      for (let i = 0; i < N - 1; i++) {            // core i -> core i+1 (beside the box being emptied)
+        const s = l.slice(i);
+        if (mode !== 'cartG') l.paths['core' + i] = [[s.x + 176, s.y + 94 + off], [l.slice(i + 1).x, s.y + 94 + off]];
+      }
+    }
+  }
+  if (cggM(mode)) {                        // classic, global grouper: core i -> core i+1, last core -> buffer
+    const sN = l.slice(N - 1), laneY = sN.y + 238 + off, bufIn = [B + 176, l.buffer.y + 90];
+    l.paths.last = [[sN.x + 88, sN.y + 226 + off], [sN.x + 88, laneY], [backX, laneY], [backX, bufIn[1]], bufIn];
+    l.paths.rebuf = [[m - 30, l.buffer.y], [m - 30, l.luif.y + SHULKER_H + 22]];
+    if (mode !== 'cartGGo') for (let i = 0; i < N - 1; i++) { const s = l.slice(i); l.paths['core' + i] = [[s.x + 176, s.y + 94 + off], [l.slice(i + 1).x, s.y + 94 + off]]; }
+  }
+  if (walk) {
+    const s0 = l.slice(0), sN = l.slice(N - 1), busY = s0.y - 14, below = top + chestH + 10;
+    l.paths.in = [[A + 88, top + chestH], [A + 88, below], [busX, below], [busX, busY], [s0.x + 88, busY], [s0.x + 88, s0.y - 6]];
+    l.paths.buf = [l.exit, [busX, l.exit[1]], [busX, busY], [s0.x + 88, busY], [s0.x + 88, s0.y - 6]];
+    l.paths.last = l.paths['back' + (N - 1)];
+  }
+  return l;
+}
+function resize() {
+  if (!S) return;
+  // leave about 290 px of the window for the tabs below the view
+  const availW = cv.parentElement.clientWidth - 2, availH = Math.max(260, window.innerHeight - cv.parentElement.getBoundingClientRect().top - window.scrollY - 290);
+  L = layout(S.N, S.mode);
+  const dpr = window.devicePixelRatio || 1;
+  zoom = Math.max(1, Math.min(4, availW / L.W, availH / L.H));
+  cv.width = Math.round(L.W * zoom * dpr); cv.height = Math.round(L.H * zoom * dpr);
+  cv.style.width = L.W * zoom + 'px'; cv.style.height = L.H * zoom + 'px';
+  ctx.setTransform(zoom * dpr, 0, 0, zoom * dpr, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+}
+const STATE = { idle: 'idle', incoming: 'boxes on the way', place: 'placing box', pull: 'pulling', reset: 'resetting', strip: 'removing unstackables', pass: 'passing box', cart: 'cart' };
+
+function draw(S) {
+  hits = [];
+  ctx.clearRect(0, 0, L.W, L.H);
+  // conveyor lines
+  for (const k of ['in', 'buf', 'rebuf', 'g']) if (L.paths[k]) line(L.paths[k], colors.lane, 2);
+  for (let i = 0; i < S.N - 1; i++) { if (L.paths['hop' + i]) line(L.paths['hop' + i], colors.lane, 2); if (L.paths['core' + i]) line(L.paths['core' + i], colors.lane, 2); }
+  if (L.paths.last && [...LOCALG, 'cgg', 'cartGG'].includes(S.mode)) line(L.paths.last, colors.lane, 1.5, [4, 3]);
+  for (const p of L.solid) line(p, colors.lane, 2);
+  for (let r = 0; r < L.rows; r++) {
+    const row = S.slices.filter(sl => L.slice(sl.i).row === r).map(sl => L.slice(sl.i));
+    if (!row.length) continue;
+    const busY = row[0].y - 14, laneY = row[0].y + 238, lastX = row[row.length - 1].x + 88;
+    line([[L.busX, busY], [lastX, busY]], colors.lane, 2);
+    line([[lastX, laneY], [L.backX, laneY]], colors.lane, 1.5, [4, 3]);
+    for (const s of row) { line([[s.x + 88, busY], [s.x + 88, s.y - 6]], colors.lane, 2); line([[s.x + 88, s.y + 226], [s.x + 88, laneY]], colors.lane, 1.5, [4, 3]); }
+  }
+  const busYs = S.slices.map(sl => L.slice(sl.i).y - 14), lanes = S.slices.map(sl => L.slice(sl.i).y + 238 + L.off);
+  line([L.exit, [L.busX, L.exit[1]]], colors.lane, 2);
+  line([[L.busX, Math.min(L.exit[1], ...busYs)], [L.busX, Math.max(L.exit[1], ...busYs)]], colors.lane, 2);
+  line([[L.backX, Math.max(...lanes)], [L.backX, L.entry[1]], L.entry], colors.lane, 1.5, [4, 3]);
+
+  // front end
+  chestGui(L.input.x, L.input.y, `Input Chest (${S.input.length})`, S.input, 6);
+  if (LOCALG.includes(S.mode)) {
+    const lb = S.luif && S.luif.box;
+    shulkerGui(L.luif.x, L.luif.y, 'LUIF', lb, { slots: new Array(27).fill(null) });
+    slotRow(S.luifQ.slice(0, 7), L.luif.x, L.luif.y + SHULKER_H + 2, 7);   // the text beside it counts the rest
+    text(S.luifQ.length ? `${S.luifQ.length} waiting` : (lb ? 'checking box' : 'idle'), L.luif.x + 136, L.luif.y + SHULKER_H + 14, { color: colors.muted, font: '10px Roboto, sans-serif' });
+    chestGui(L.buffer.x, L.buffer.y, `Buffer ${S.buffer.length}`, S.buffer, 6);
+    text(isLocalM(S.mode) ? (S.slices.some(sl => sl.state === 'idle' && !sl.filter) ? 'sending boxes: a slice is free' : 'all slices busy')
+      : { idle: 'between cycles', stream: `cycle ${S.cycles}: groupers + slices`, reset: 'slices resetting' }[S.phase],
+      L.buffer.x, L.buffer.y + L.chestH + 8, { color: colors.muted, font: '10px Roboto, sans-serif' });
+  } else if (!GLOBALG.includes(S.mode)) {
+    chestGui(L.buffer.x, L.buffer.y, `Buffer ${S.buffer.length}`, S.buffer, 6);
+    text(isHyperM(S.mode) ? (S.feedCyc != null ? `cycle ${S.feedCyc} entering slice 1` : 'waiting for slices 1 and 2')
+      : S.cycleOn ? `cycle ${S.cycles}: boxes walk slice 1 → ${S.N}` : 'between cycles', L.buffer.x, L.top + L.chestH + 14, { color: colors.muted, font: '10px Roboto, sans-serif' });
+  } else {
+  const lb = S.luif && S.luif.box;
+    shulkerGui(L.luif.x, L.luif.y, 'LUIF', lb, { slots: new Array(27).fill(null) });
+    slotRow(S.luifQ.slice(0, 7), L.luif.x, L.luif.y + SHULKER_H + 2, 7);   // the text beside it counts the rest
+    text(S.luifQ.length ? `${S.luifQ.length} waiting` : (lb ? 'checking box' : 'idle'), L.luif.x + 136, L.luif.y + SHULKER_H + 14, { color: colors.muted, font: '10px Roboto, sans-serif' });
+  
+    chestGui(L.buffer.x, L.buffer.y, `Buffer ${S.buffer.length}/${S.p.batch}`, S.buffer, 6);
+    const g = S.grp;
+    shulkerGui(L.grouper.x, L.grouper.y, g.state === 'idle' ? 'Grouper' : `Grouper ${cggM(S.mode) ? `> slice ${S.gk + 1} ` : ''}${g.idx}/${g.snap.length}`, g.checking, { slots: new Array(27).fill(null) });
+    // group panel under the grouper: the group being formed, else the one waiting for a free slice
+    const w = L.waiting, gr = S.pending[0], forming = g.state === 'scan' || g.state === 'lead';
+    panel(w.x, w.y, w.w, w.h, '');
+    const head = forming ? 'GROUPING' : gr ? 'READY GROUP' : 'GROUP', small = { color: colors.muted, font: '10px Roboto, sans-serif' };
+    text(head, w.x + 8, w.y + 14, { font: '600 10px Montserrat, sans-serif', color: colors.muted });
+    const filter = forming ? g.filter : gr && gr.filter, boxes = forming ? g.group : gr ? gr.boxes : [];
+    const n = boxes.length, more = !forming && S.pending.length > 1 ? ` +${S.pending.length - 1}` : '';
+    text(filter ? `${n} box${n === 1 ? '' : 'es'}${more}` : 'idle', w.x + (forming ? 76 : gr ? 96 : 54), w.y + 14, small);
+    if (filter) { slotBg(w.x + 8, w.y + 21); icon(filter, w.x + 8, w.y + 21, 16); slotRow(boxes, w.x + 28, w.y + 20, 7); }
+  }
+
+  // slices: full-height columns
+  S.slices.forEach(sl => {
+    const { x, y } = L.slice(sl.i);
+    text(`SLICE ${sl.i + 1}`, x, y + 11, { font: '600 10px Montserrat, sans-serif', color: colors.muted });
+    ctx.font = '500 11px Roboto, sans-serif';
+    let name = sl.filter ? niceName(sl.filter) : 'no item';
+    while (name.length > 3 && ctx.measureText(name).width > 100) name = name.slice(0, -2) + '…';
+    text(name, x + 52, y + 11, { font: '500 11px Roboto, sans-serif', color: sl.filter ? colors.ink : colors.muted });
+    slotBg(x + 159, y - 6);
+    if (sl.filter) icon(sl.filter, x + 159, y - 6, 16);
+    // slice buffer (rest of the group) above the box being emptied
+    const lu = ownLuM(S.mode), qn = lu ? 7 : 9;         // 'cart': the slice's own LUIF sits right of its queue
+    const gm = LOCALG.includes(S.mode);   // local groupers: top row = grouper i
+    if (gm) {                                            // the grouper's GUI: the box it checks, else the box it keeps
+      const g = S.gcur[sl.i], q = S.gq[sl.i].length;
+      const title = g ? `Grouper - ${g.t} gt${q ? `, ${q} waiting` : ''}` : sl.gHeld ? 'Grouper - kept as filter' : sl.gDone ? 'Grouper - done' : 'Grouper';
+      shulkerGui(x, y + 16, title, g ? g.box : sl.gHeld || null, { slots: new Array(27).fill(null) });
+      slotRow(sl.queue.slice(0, qn), x, y + 97, qn);       // waiting for the core
+    } else {
+      slotRow(sl.queue.slice(0, qn), x, y + 15, qn);
+      slotRow(sl.queue.slice(qn, 2 * qn), x, y + 33, qn);
+    }
+    if (lu) {
+      mcText('LUIF', x + 134, y + 20, colors.muted);
+      slotBg(x + 159, y + 16); if (sl.lu) boxIcon(sl.lu.box, x + 159, y + 16);
+      text(sl.lu ? (sl.lu.t > 0 ? `${sl.lu.t} gt` : 'ready') : 'idle', x + 134, y + 46, { color: colors.muted, font: '10px Roboto, sans-serif' });
+    }
+    if (sl.queue.length > (gm ? 1 : 2) * qn) { const t = `+${sl.queue.length - (gm ? 1 : 2) * qn}`, ox = x + qn * 18 - 17, oy = gm ? y + 98 : y + 34; ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(ox, oy, 16, 16); mcText(t, ox + 16 - mcWidth(t), oy + 4, '#FFFFFF', '#3F3F3F'); }
+    const by = y + 56 + L.off;
+    shulkerGui(x, by, STATE[sl.state][0].toUpperCase() + STATE[sl.state].slice(1) + (isHyperM(S.mode) && owner(S, sl.i) !== null ? ` - cycle ${owner(S, sl.i)}` : '') + (sl.state === 'cart' ? (sl.filter ? ` ${sl.cn}/${cartFill(stackSize(sl.filter), S.p.ss)}` : ' taking 1st item') + ` - ${sl.ct} gt` : ''), sl.cur, { slots: new Array(27).fill(null) });
+    const oy = by + SHULKER_H + 8;
+    shulkerGui(x, oy, 'Output', null, { slots: sl.filter ? outSlots(sl.filter, sl.out) : null });
+    text(`out: ${sl.full} full · ${sl.partial} partial`, x, oy + SHULKER_H + 14, { color: colors.muted, font: '10px "Roboto Mono", monospace' });
+  });
+
+  // boxes and groups on the move
+  for (const m of S.travel) {
+    const [x, y] = pathAt(L.paths[m.path], m.t / m.T);
+    const grp = m.what.boxes;
+    ctx.fillStyle = grp ? colors.blue : BOXC;
+    ctx.beginPath(); ctx.arc(x, y, grp ? 7 : 5, 0, Math.PI * 2); ctx.fill();
+    if (grp) text(String(grp.length), x, y + 3.5, { font: '600 9px Roboto, sans-serif', color: colors.surface, align: 'center' });
+  }
+  renderTip();
+}
+function outIcon(b, sx, sy) {        // finished output box: shulker with its item; amber bar = partial
+  boxIcon(b, sx, sy);
+  if (!b.full) { ctx.fillStyle = '#E0A100'; ctx.fillRect(sx, sy + 14, 16, 2); }
+}
+
+// hover: Minecraft-style tooltip with the box contents, or the item name over a big box's slot
+let mouse = null;
+const tip = document.getElementById('tip');
+function hoverInfo() {
+  if (!mouse || !S) return null;
+  const list = mouse.src === 'out' ? outHits : hits;
+  const h = list.findLast(h => mouse.x >= h.x && mouse.x <= h.x + h.w && mouse.y >= h.y && mouse.y <= h.y + h.h);
+  if (!h) return null;
+  if (h.w > 16) {
+    const k = Math.floor((mouse.x - h.x - 8) / 18) + 9 * Math.floor((mouse.y - h.y - 18) / 18);
+    const inGrid = mouse.x - h.x >= 8 && mouse.y - h.y >= 18 && mouse.x - h.x < 170;
+    const s = inGrid && k >= 0 && k < 27 ? h.b.slots[k] : null;
+    return s ? { name: `${niceName(s[0])} × ${s[1]}` } : null;
+  }
+  return { box: h.b };
+}
+function renderTip() {
+  const info = hoverInfo();
+  if (!info) { tip.hidden = true; return; }
+  const Z = 2, dpr = window.devicePixelRatio || 1;
+  const main = ctx, mainHits = hits, sel = selected;
+  let w, h;
+  if (info.box) { w = 176; h = SHULKER_H + 12; } else { w = mcWidth(info.name) + 8; h = 16; }
+  tip.width = Math.round(w * Z * dpr); tip.height = Math.round(h * Z * dpr); tip.style.width = w * Z + 'px'; tip.style.height = h * Z + 'px';
+  ctx = tip.getContext('2d'); ctx.setTransform(Z * dpr, 0, 0, Z * dpr, 0, 0); ctx.imageSmoothingEnabled = false;
+  hits = []; selected = null;
+  if (info.box) {
+    const b = info.box;
+    ctx.fillStyle = 'rgba(16,0,16,.94)'; ctx.fillRect(0, 0, w, 12);
+    mcText(b.out ? `Output box from slice ${b.slice + 1}${b.full ? '' : ' (partial)'}` : `Shulker box ${where(b)}`, 3, 2, '#FFFFFF', '#3F3F3F');
+    shulkerGui(0, 12, 'Shulker Box', null, { slots: b.slots });
+  } else {
+    ctx.fillStyle = 'rgba(16,0,16,.94)'; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#5000FF'; ctx.lineWidth = 1; ctx.strokeRect(1.5, 1.5, w - 3, h - 3);
+    mcText(info.name, 4, 4, '#FFFFFF', '#3F3F3F');
+  }
+  ctx = main; hits = mainHits; selected = sel;
+  tip.style.left = Math.max(4, Math.min(mouse.px + 14, window.innerWidth - w * Z - 8)) + 'px';
+  tip.style.top = (mouse.py + 14 + h * Z > window.innerHeight ? mouse.py - 14 - h * Z : mouse.py + 14) + 'px';
+  tip.hidden = false;
+}
+for (const [el, src] of [[cv, 'main'], [document.getElementById('outCv'), 'out']]) {
+  el.addEventListener('mousemove', e => {
+    const r = el.getBoundingClientRect(), z = src === 'out' ? outZoom : zoom;
+    mouse = { src, x: (e.clientX - r.left) / z, y: (e.clientY - r.top) / z, px: e.clientX, py: e.clientY };
+    renderTip();
+  });
+  el.addEventListener('mouseleave', () => { mouse = null; tip.hidden = true; });
+}
+
+// output chests: every finished output box, double chests of 54
+let outHits = [], outZoom = 2;
+function drawOutChests() {
+  const oc = $('outCv'), boxes = S.outBoxes, n = Math.max(1, Math.ceil(boxes.length / 54));
+  outZoom = Math.max(1, Math.min(2, zoom));
+  const avail = oc.parentElement.clientWidth / outZoom, per = Math.max(1, Math.floor((avail + 8) / 184));
+  const W = Math.min(n, per) * 184 - 8, H = Math.ceil(n / per) * 147 - 8, dpr = window.devicePixelRatio || 1;
+  oc.width = Math.round(W * outZoom * dpr); oc.height = Math.round(H * outZoom * dpr); oc.style.width = W * outZoom + 'px'; oc.style.height = H * outZoom + 'px';
+  const main = ctx, mainHits = hits;
+  ctx = oc.getContext('2d'); ctx.setTransform(outZoom * dpr, 0, 0, outZoom * dpr, 0, 0); ctx.imageSmoothingEnabled = false;
+  hits = [];
+  for (let c = 0; c < n; c++) {
+    const x = (c % per) * 184, y = Math.floor(c / per) * 147, part = boxes.slice(c * 54, c * 54 + 54);
+    chestGui(x, y, n > 1 ? `Output Chest ${c + 1}` : 'Output Chest', [], 6);
+    part.forEach((b, k) => outIcon(b, ...slotXY(x, y, k)));
+  }
+  outHits = hits; ctx = main; hits = mainHits;
+}
+
+// ---------------------------------------------------------------- UI
+const $ = id => document.getElementById(id);
+const fmt = (v, d = 0) => v.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
+let source = null, sourceName = '', S = null, playing = false, lastT = 0, acc = 0, started = false;
+
+function setStatus(m, err = false) { $('status').textContent = m; $('status').classList.toggle('err', err); }
+function params() {
+  const p = { batch: Math.max(1, Math.min(1000, Math.floor(+$('batch').value || 54))), waitSlice: $('waitSlice').checked };
+  for (const [k, , d] of TIMINGS) { const el = $('t_' + k), v = el ? +el.value : d; p[k] = Number.isFinite(v) && v >= 0 ? v : d; }   // no field: fixed value
+  return p;
+}
+// ---------------------------------------------------------------- flowchart of the chosen logic (drawn like Carlos's flowchart.png)
+const LOGIC_NAME = { multi: 'Multithreaded, global grouper', local: 'Multithreaded, local groupers', classic: 'Classic', cart: 'Cart classic, no unstackable handling', cartU: 'Cart classic, unstackable handling',
+  hyper: 'Hyperthreaded classic', grouped: 'Classic, local groupers', cgg: 'Classic, global grouper', cartG: 'Cart classic, local groupers, no unstackable handling', cartGU: 'Cart classic, local groupers, unstackable handling',
+  cartH: 'Cart hyperthreaded, no unstackable handling', cartHU: 'Cart hyperthreaded, unstackable handling',
+  cartGG: 'Cart classic, global grouper, unstackable handling', cartGGo: 'Cart classic, global grouper, no unstackable handling',
+  cartMG: 'Cart multithreaded, global grouper', cartML: 'Cart multithreaded, local groupers' };
+function flowSVG(mode, N, p) {
+  const W = 144, H = 58, STEP = 174, R1 = 70, R2 = 210, out = [];
+  let maxX = 0, maxY = 0;
+  const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const MARKS = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+  const split = t => MARKS.includes(t[0]) ? [t[0], t.slice(2)] : ['', t];    // '① text' -> note number, text
+  const label = (cx, cy, lines) => lines.forEach((t, k) => {
+    const [m, rest] = split(t);
+    out.push(`<text x="${cx}" y="${cy + (k - (lines.length - 1) / 2) * 13 + 4}" text-anchor="middle" font-size="${k ? 10 : 12}" fill="${k ? 'var(--muted)' : 'var(--ink)'}" font-weight="${k ? 400 : 500}">${m ? `<tspan fill="var(--blue)" font-size="13">${m}</tspan> ` : ''}${esc(rest)}</text>`);
+  });
+  const box = (x, y, lines, kind = 'rect') => {
+    maxX = Math.max(maxX, x + W); maxY = Math.max(maxY, y + H);
+    const stroke = kind === 'slice' ? 'var(--ink)' : 'var(--lane)';
+    if (kind === 'circle') out.push(`<ellipse cx="${x + W / 2}" cy="${y + H / 2}" rx="${W / 2}" ry="${H / 2 + 6}" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/>`);
+    else if (kind === 'diamond') out.push(`<polygon points="${x + W / 2},${y - 6} ${x + W},${y + H / 2} ${x + W / 2},${y + H + 6} ${x},${y + H / 2}" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.2"/>`);
+    else out.push(`<rect x="${x}" y="${y}" width="${W}" height="${H}" fill="var(--surface)" stroke="${stroke}" stroke-width="1.2"/>`);
+    label(x + W / 2, y + H / 2, lines);
+  };
+  const arrow = (pts, text, dashed, tx, ty) => {
+    for (const [x, y] of pts) { maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); }
+    out.push(`<polyline points="${pts.map(q => q.join(',')).join(' ')}" fill="none" stroke="var(--blue)" stroke-width="1.6"${dashed ? ' stroke-dasharray="5 4"' : ''} marker-end="url(#ah)"/>`);
+    if (text) {
+      const [a, b] = pts.length > 2 ? [pts[1], pts[2]] : pts, x = tx ?? (a[0] + b[0]) / 2, y = ty ?? (a[1] + b[1]) / 2 - 5, [m, rest] = split(text);
+      const [mx, my] = y - 13 < 12 ? [x - rest.length * 2.6 - 12, y + 1] : [x, y - 13];   // note number above, or left of the text near the top edge
+      if (m) out.push(`<text x="${mx}" y="${my}" text-anchor="middle" font-size="14" fill="var(--blue)" paint-order="stroke" stroke="var(--surface)" stroke-width="4">${m}</text>`);
+      if (rest) out.push(`<text x="${x}" y="${y}" text-anchor="middle" font-size="10" fill="var(--muted)" paint-order="stroke" stroke="var(--surface)" stroke-width="4">${esc(rest)}</text>`);
+    }
+  };
+  const right = (x, y) => [x + W, y + H / 2], left = (x, y) => [x, y + H / 2], top = (x, y) => [x + W / 2, y], bottom = (x, y) => [x + W / 2, y + H];
+  // numbered notes: a circled number on the chart, the full explanation in the list under it
+  const notes = [], n = t => { notes.push(t); return MARKS[notes.length - 1] + ' '; };
+  const cart = mode.startsWith('cart'), selfN = ['cartU', 'cartHU', 'cartGU', 'cartGG'].includes(mode);
+  const under = Math.max(p.dwell, cartFill(64, p.ss) - 1), cyc = p.cartGap + p.dwell;
+  const check = cart ? 'a whole cart cycle to find out' : 'the hopper sees it at once';
+  const sliceNote = cart
+    ? `Cart slice: hopper minecarts loaded 0-U-U-U-U (slot 1 is the variable filter, the rest are blocked) take turns under the box. The first cart takes the box's first item, and that names the slice's item; every later cart already carries it and can only pull that item. A cart leaves once it reads the detection level (SS${p.ss}); a cart that leaves below it means the box has no more of the item, so the box is done. That's why a box costs at least one cart cycle at every slice it visits, even when it never held the item.`
+      + (selfN ? ' When the first item is an unstackable it fills the cart at once: that cart only removes it, and the next cart tries again with the next item.'
+        : ' These cores can\'t take a box that leads with an unstackable, so a LUIF always comes first.')
+      + ' At reset the partial output box is ejected and the item forgotten.'
+    : 'Slice (hopper core): the variable-filter hopper takes the box\'s first item, which names the slice\'s item, then pulls only that item; when the box has no more of it, the box leaves. At reset the partial output box is ejected and the item forgotten.';
+  const cartCyc = `SS${p.ss} · ${p.cartGap} + ≥${p.dwell} gt cycles`;
+  let sm = '';
+  const slice = (x, y, i, when) => {
+    if (!i) sm = n(sliceNote);
+    box(x, y, [(i ? '' : sm) + (cart ? `Cart slice ${i + 1}` : `Slice ${i + 1}`),
+      ...(cart ? [cartCyc] : [`1 item / ${p.pull} gt`]), ...(selfN ? ['unstackable: 1 cart cycle'] : []), `resets ${when} (${p.reset} gt)`], 'slice');
+  };
+  const output = (x, y) => { arrow([[x + W - 24, y + H], [x + W - 24, y + H + 34]], ''); out.push(`<text x="${x + W - 24}" y="${y + H + 48}" text-anchor="middle" font-size="10" fill="var(--muted)">output boxes</text>`); maxY = Math.max(maxY, y + H + 52); };
+  // leftover boxes: a short dashed drop from each slice into one shared return lane to the LUIF
+  const lane = (x, y1, y2) => { maxY = Math.max(maxY, y2); out.push(`<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="var(--blue)" stroke-width="1.6" stroke-dasharray="5 4"/>`); };
+  const returnLane = (fromX, y, LU, why) => arrow([[fromX, y], [LU[0] + 30, y], [LU[0] + 30, LU[1] + H]], `${n(why)}leftovers ${p.back} gt`, true, LU[0] + STEP, y - 5);
+  const X0 = 20, IN = [X0, R1];
+  box(...IN, ['Input chest', `${p.batch} boxes, 1 / ${p.input} gt`]);
+  const inNote = () => n(`Input: boxes come in batches of ${p.batch}; a new batch only starts once the previous one has fully left the machine.`);
+  const luifNote = 'LUIF: removes the box\'s leading unstackables (to the unstackable output) until a stackable item comes first, and drops empty boxes. Groupers and filter cores break on a box that leads with an unstackable, so boxes pass the LUIF first.';
+  const luifAt = (x, y) => { box(x, y, [n(luifNote) + 'LUIF', `${p.luif} gt + ${p.unst} gt / unstackable`]); arrow([[x + W / 2, y], [x + W / 2, y - 26]], ''); out.push(`<text x="${x + W / 2 - 6}" y="${y - 16}" text-anchor="end" font-size="10" fill="var(--muted)">unstackables, empties</text>`); };
+  const cycleNote = 'Next cycle: once every box of the cycle is through, all slices reset together and forget their items, and the buffer goes round again.';
+  if (mode === 'multi' || mode === 'cartMG') {
+    const LU = [X0 + STEP, R1], BU = [X0 + 2 * STEP, R1], G = [X0 + 3 * STEP, R1], RG = [X0 + 4 * STEP, R1];
+    arrow([right(...IN), left(...LU)], `${inNote()}${p.link} gt`);
+    luifAt(...LU); box(...BU, ['Buffer', `${p.batch} slots`], 'circle');
+    box(...G, [n(`Global grouper: once the whole batch is in the buffer it takes the first box's first item and checks every buffer box (${p.grouper} gt each); all boxes holding that item form a group, the naming box first. It keeps only one group waiting${p.waitSlice ? ', and only groups while a slice is free and every leftover box is back in the buffer' : ''}.`) + 'Grouper', `${p.grouper} gt per box`, p.waitSlice ? 'waits: free slice' : '1 group ahead'], 'diamond');
+    box(...RG, ['Ready group', 'to first free slice']);
+    arrow([right(...LU), left(...BU)], `${p.link} gt`); arrow([right(...BU), left(...G)], ''); arrow([right(...G), left(...RG)], '');
+    const busY = R2 - 24, laneY = R2 + H + 64;
+    const toNote = n(`A ready group goes to the first free slice (${p.toSlice} gt), whatever its number. The slice works through the group's boxes (its first box names the item) and resets on its own when the group is done: slices don't wait for each other, so there are no global cycles and output isn't ideal.`);
+    for (let i = 0; i < N; i++) {
+      const S = [X0 + 2 * STEP + i * STEP, R2];
+      slice(...S, i, 'after its group');
+      arrow([bottom(...RG), [RG[0] + W / 2, busY], [S[0] + W / 2, busY], top(...S)], i === 0 ? `${toNote}${p.toSlice} gt` : '', false, (RG[0] + W / 2 + S[0] + W / 2) / 2, busY - 5);
+      lane(S[0] + 24, R2 + H, laneY);
+      output(...S);
+    }
+    returnLane(X0 + 2 * STEP + (N - 1) * STEP + 24, laneY, LU, `Leftovers: a box the slice is done with still holds other items, so it goes back to the LUIF (${p.back} gt), then the buffer, to be grouped again.`);
+  } else if (LOCALG.includes(mode)) {
+    const local = isLocalM(mode), LU = [X0 + STEP, R1], back = local || mode === 'cartG', chain = mode === 'grouped' || mode === 'cartGU';
+    arrow([right(...IN), left(...LU)], `${inNote()}${p.link} gt`);
+    luifAt(...LU);
+    const gx = i => X0 + (local ? 3 : 2) * STEP + i * STEP;
+    let BU;
+    if (local) { BU = [X0 + 2 * STEP, R1]; box(...BU, ['Buffer', 'boxes keep circling'], 'circle'); arrow([right(...LU), left(...BU)], `${p.link} gt`); arrow([right(...BU), left(gx(0), R1)], n(`The buffer sends a box to grouper 1 (one per ${p.input} gt) while any slice is free${p.waitSlice ? ' and every leftover box is back' : ''}.`) + 'slice free', false, BU[0] + W + 14, R1 + H / 2 - 18); }
+    else { BU = [gx(N), R1]; box(...BU, ['Buffer', 'next cycle after reset'], 'circle'); arrow([right(...LU), left(gx(0), R1)], `${p.link} gt`); }
+    const gNote = n(`Grouper i checks each box (${p.grouper} gt) against slice i's item; a box it doesn't claim moves on to grouper i+1 (${p.hop} gt).`);
+    const cNote = n(local
+      ? `A free slice's grouper takes the first item of the box it's checking as the slice's item and claims that box; a busy slice's grouper keeps claiming boxes with its item; a resetting slice lets boxes pass. Claimed boxes queue at the core.`
+      : `Grouper i sends a box holding slice i's item down to core i (${p.hop} gt) and keeps checking the boxes behind it; a grouper whose slice has no item yet names it from the box's first item.`
+        + (mode === 'cartG' ? ' Here a grouper keeps its latest matching box (its filter) until it has seen every box of the cycle, including the ones coming round again from earlier cores; only then that box goes down too.' : ''));
+    for (let i = 0; i < N; i++) {
+      const G = [gx(i), R1], S = [gx(i), R2];
+      box(...G, [(i ? '' : gNote) + `Grouper ${i + 1}`, `${p.grouper} gt per box`], 'diamond');
+      slice(...S, i, local ? 'when done' : 'with the cycle');
+      arrow([bottom(...G), top(...S)], (i ? '' : cNote) + `claims ${p.hop} gt`);
+      if (i < N - 1) arrow([right(...G), left(gx(i + 1), R1)], `${p.hop} gt`);
+      if (chain) {                                   // core i -> core i+1, the last core -> buffer (right angles only)
+        if (i < N - 1) arrow([right(...S), left(gx(i + 1), R2)], (i ? '' : n(`Core i → core i+1 (${p.hop} gt): once core i is done with a box it never goes back to a grouper, it walks the remaining cores instead. Each core checks it (${check}) and unloads its own item if the box has it; a core with no item yet takes the first item of the box that reaches it, so slice i gets its item from whichever box arrives first, from grouper i or from core i-1. Boxes queue at a core first come, first served. The grouper can't see the core: if a box from the core line names core i first, core i's item and grouper i's item can differ, and output isn't always ideal.`)) + `${p.hop} gt`);
+        else { const gapX = S[0] + W + 15; arrow([right(...S), [gapX, S[1] + H / 2], [gapX, R1 + H + 22], [gx(N) + W / 2, R1 + H + 22], [gx(N) + W / 2, R1 + H + 6]], n('The last core sends its boxes to the buffer, where they wait for the next cycle.') + `${p.link} gt`, false, gapX + 16, (R1 + H + 22 + S[1] + H / 2) / 2); }
+      }
+      output(...S);
+    }
+    if (back) {
+      const laneY = R2 + H + 64;
+      for (let i = 0; i < N; i++) lane(gx(i) + 24, R2 + H, laneY);
+      returnLane(gx(N - 1) + 24, laneY, LU, local
+        ? `Leftovers: a box the slice is done with goes back to the LUIF (${p.back} gt), then the buffer; a slice resets on its own when its queue is done.`
+        : `Leftovers: these cores can't take a box that might now lead with an unstackable, so a finished box can't go on to the next core. It goes back to the LUIF (${p.back} gt) and through grouper 1..N again. It can't tell which slice it came from, but it no longer holds any item it already met, so only later groupers can claim it.`);
+    }
+    if (local) {
+      arrow([top(gx(N - 1), R1), [gx(N - 1) + W / 2, R1 - 34], [BU[0] + W / 2, R1 - 34], [BU[0] + W / 2, R1 - 6]], n(`Boxes no grouper claims go straight back to the buffer (${p.link} gt), skipping the LUIF, and keep circling.`) + `unclaimed ${p.link} gt`, true);
+    } else {
+      arrow([right(gx(N - 1), R1), left(...BU)], `${p.link} gt`);
+      arrow([top(...BU), [BU[0] + W / 2, R1 - 50], [LU[0] + W - 20, R1 - 50], [LU[0] + W - 20, R1]], n(cycleNote) + 'next cycle', true);
+    }
+  } else if (cggM(mode)) {                         // classic, global grouper: groups in turn, cores chained, back to the buffer
+    const ret = mode === 'cartGGo';                 // no unstackable handling: cores send boxes back through the LUIF
+    const LU = [X0 + STEP, R1], BU = [X0 + 2 * STEP, R1], G = [X0 + 3 * STEP, R1], sx = i => X0 + 3 * STEP + i * STEP;
+    arrow([right(...IN), left(...LU)], `${inNote()}${p.link} gt`);
+    luifAt(...LU); box(...BU, ['Buffer', 'unpicked + returned boxes'], 'circle');
+    box(...G, [n(`Global grouper: waits until the whole cycle is in the buffer, then forms group 1, 2 … N in turn. Group k's item is the first item of the first box in the buffer (the grouper can't see which item a core may already have taken); it checks every buffer box (${p.grouper} gt each) and the matching ones go to core k.`) + 'Global grouper', `${p.grouper} gt per box`, 'once all are in'], 'diamond');
+    arrow([right(...LU), left(...BU)], `${p.link} gt`); arrow([right(...BU), left(...G)], '');
+    const busY = R2 - 24, laneY = R2 + H + 64;
+    for (let i = 0; i < N; i++) {
+      const S = [sx(i), R2];
+      slice(...S, i, 'with the cycle');
+      arrow(i ? [bottom(...G), [G[0] + W / 2, busY], [S[0] + W / 2, busY], top(...S)] : [bottom(...G), top(...S)], i ? '' : n(`Group k goes to core k (${p.toSlice} gt), the box that named the item first. Core k starts on it while the grouper forms the next group.`) + `group i → slice i, ${p.toSlice} gt`, false, i ? undefined : G[0] + W / 2 + 70, i ? undefined : busY - 5);
+      if (i < N - 1 && !ret) arrow([right(...S), left(sx(i + 1), R2)], (i ? '' : n(`Core i → core i+1 (${p.hop} gt): a box core i is done with walks on through the remaining cores, never back to the grouper. Each core checks it (${check}) and unloads its own item if the box has it; a core with no item yet (its group not formed yet) takes the first item of the box that reaches it. The grouper can't see that and names each group from the first box in its buffer, so a core named early by a core-line box may get a different item than its group, and output isn't always ideal. This way a box from group 1 that also holds slice 4's item meets core 4 on the way.`)) + `${p.hop} gt`);
+      if (ret) lane(S[0] + 24, R2 + H, laneY);
+      output(...S);
+    }
+    if (ret) returnLane(sx(N - 1) + 24, laneY, LU, `Leftovers: these cores can't pass a box on (it might now lead with an unstackable), so it goes back through the LUIF (${p.back} gt) into the buffer. The grouper sends groups off without keeping their items, so a box that still holds a later slice's item only meets it if it's back in the buffer before that slice's group is formed; otherwise the item waits for the next cycle and output isn't always ideal.`);
+    else arrow([[sx(N - 1) + 24, R2 + H], [sx(N - 1) + 24, laneY], [BU[0] + W / 2, laneY], [BU[0] + W / 2, R1 + H + 6]], n(`The last core sends boxes back to the same buffer (${p.link} gt); they wait there for the next cycle.`) + `last core → buffer ${p.link} gt`, true, (sx(N - 1) + BU[0]) / 2 + 60, laneY - 5);
+    arrow([top(...BU), [BU[0] + W / 2, R1 - 50], [LU[0] + 30, R1 - 50], [LU[0] + 30, R1]], n(cycleNote) + 'next cycle', true);
+  } else if (ownLuM(mode)) {                        // a LUIF above every cart slice; slice i -> LUIF i+1
+    const hyper = mode === 'cartH';
+    const sx = i => X0 + STEP + i * STEP, BU = [sx(N), R1];
+    arrow([right(...IN), left(sx(0), R1)], `${inNote()}${p.link} gt`);
+    for (let i = 0; i < N; i++) {
+      const LU = [sx(i), R1], S = [sx(i), R2];
+      box(...LU, [(i ? '' : n(`Every cart slice has its own LUIF (${p.luif} gt + ${p.unst} gt per leading unstackable), because these cores can't handle a leading unstackable and a front LUIF couldn't tell which slice a box came back from. The LUIF works on the next box while its slice is busy.`)) + `LUIF ${i + 1}`, `${p.luif} gt + ${p.unst} gt / unstackable`]);
+      arrow([[LU[0] + W - 24, LU[1]], [LU[0] + W - 24, LU[1] - 26]], '');
+      if (!i) out.push(`<text x="${LU[0] + W - 18}" y="${LU[1] - 16}" font-size="10" fill="var(--muted)">unstackables, empties</text>`);
+      slice(...S, i, hyper ? 'after its cycle' : 'with the cycle');
+      arrow([bottom(...LU), top(...S)], 'when free');
+      const gapX = S[0] + W + 15, last = i === N - 1;
+      arrow([[S[0] + W, S[1] + H / 2], [gapX, S[1] + H / 2], [gapX, R1 + H / 2], left(last ? BU[0] : sx(i + 1), R1)], (i ? '' : n(`Slice i → LUIF i+1 (${p.pass} gt): every box goes through every slice. A slice with no item names it from the box's first item; a slice with an item spends ${check} whether the box holds it.`)) + (last ? `${p.link} gt` : `${p.pass} gt`), false, gapX + 16, (R1 + H / 2 + S[1] + H / 2) / 2);
+      output(...S);
+    }
+    box(...BU, ['Buffer', hyper ? 'next cycle: slices 1-2 free' : 'next cycle after reset'], 'circle');
+    arrow([top(...BU), [BU[0] + W / 2, R1 - 50], [sx(0) + 30, R1 - 50], [sx(0) + 30, R1]], n(hyper ? `Hyperthreaded: cycles overlap. Each slice resets as soon as the last box of its cycle has passed it; the next cycle (exactly the boxes leaving this one) starts entering once slices 1 and 2 are free, and a box only moves into a slice when that slice and the next are free or of its own cycle, so one empty slice always separates two cycles. Output stays ideal.` : cycleNote) + (hyper ? 'cycles overlap, one empty slice between' : 'next cycle'), true);
+  } else {
+    const hyper = isHyperM(mode), sx = i => X0 + STEP + i * STEP, BU = [sx(N), R1];
+    arrow([right(...IN), left(sx(0), R1)], `${inNote()}${p.link} gt`);
+    for (let i = 0; i < N; i++) {
+      const S = [sx(i), R1];
+      slice(...S, i, hyper ? 'after its cycle' : 'with the cycle');
+      arrow([right(...S), left(i < N - 1 ? sx(i + 1) : BU[0], R1)], (i ? '' : n(`Slice i → slice i+1 (${p.pass} gt): boxes walk every slice in a line. A slice with no item ${cart ? 'lets its cart take the box\'s first item' : 'strips leading unstackables (' + p.unst + ' gt each) and takes the first item'}; a slice with an item unloads it if the box holds it (${check}) and the boxes behind wait.`)) + (i < N - 1 ? `${p.pass} gt` : `${p.link} gt`));
+      output(...S);
+    }
+    box(...BU, ['Buffer', hyper ? 'next cycle: slices 1-2 free' : 'next cycle after reset'], 'circle');
+    arrow([top(...BU), [BU[0] + W / 2, R1 - 40], [sx(0) + W / 2, R1 - 40], [sx(0) + W / 2, R1]], n(hyper ? `Hyperthreaded: cycles overlap. Each slice resets as soon as the last box of its cycle has passed it; the next cycle (exactly the boxes leaving this one) starts entering once slices 1 and 2 are free, and one empty slice always separates two cycles. Output stays ideal.` : cycleNote) + (hyper ? 'cycles overlap, one empty slice between' : 'next cycle'), true);
+  }
+  const Wd = maxX + 20, Hd = maxY + 16;
+  return { notes, svg: `<svg width="${Wd}" height="${Hd}" viewBox="0 0 ${Wd} ${Hd}" role="img" aria-label="Flowchart of the ${LOGIC_NAME[mode]} logic">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--blue)"/></marker></defs>${out.join('')}</svg>` };
+}
+function renderFlow() {
+  if (!S) return;
+  $('flowTitle').textContent = `Flowchart: ${LOGIC_NAME[S.mode]}, ${S.N} slice${S.N > 1 ? 's' : ''}`;
+  const f = flowSVG(S.mode, S.N, S.p), esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  $('flow').innerHTML = f.svg;
+  $('flowNotes').innerHTML = f.notes.map(t => t.replace(/\s*\((?:[^()]*\d+ gt[^()]*)\)/g, '')).map((t, k) =>   // logic first: drop the timing asides
+ `<li><b>${'①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'[k]}</b>${esc(t)}</li>`).join('');
+}
+
+// ---------------------------------------------------------------- every logic on the loaded set, side by side
+const CMP = [['multi', false, 'Multithreaded, global grouper'], ['multi', true, 'Multithreaded, global grouper (waits for a free slice)'],
+  ['local', false, 'Multithreaded, local groupers'], ['local', true, 'Multithreaded, local groupers (waits for a free slice)'],
+  ['classic', false, 'Classic'], ['cartU', false, 'Cart classic, unstackable handling'], ['cart', false, 'Cart classic, no unstackable handling'], ['hyper', false, 'Hyperthreaded classic'], ['grouped', false, 'Classic, local groupers'], ['cgg', false, 'Classic, global grouper'], ['cartG', false, 'Cart classic, local groupers, no unstackable handling'], ['cartGU', false, 'Cart classic, local groupers, unstackable handling'],
+  ['cartH', false, 'Cart hyperthreaded, no unstackable handling'], ['cartHU', false, 'Cart hyperthreaded, unstackable handling'],
+  ['cartGG', false, 'Cart classic, global grouper, unstackable handling'], ['cartGGo', false, 'Cart classic, global grouper, no unstackable handling'],
+  ['cartMG', false, 'Cart multithreaded, global grouper'], ['cartMG', true, 'Cart multithreaded, global grouper (waits for a free slice)'],
+  ['cartML', false, 'Cart multithreaded, local groupers'], ['cartML', true, 'Cart multithreaded, local groupers (waits for a free slice)']];
+let cmpToken = 0;
+function resetCompare() {
+  cmpToken++;
+  $('cmp').tBodies[0].innerHTML = '';
+  $('cmpStatus').textContent = source ? '' : 'Load a set first.';
+  $('cmpRun').disabled = !source;
+  if (S) $('cmpTitle').textContent = `All logics compared: ${sourceName}, ${S.N} slice${S.N > 1 ? 's' : ''}, batch ${S.p.batch}`;
+}
+function runCompare() {
+  if (!source || !S) return;
+  const token = ++cmpToken, N = S.N, base = params(), seeds = [1, 2, 3], rows = [];
+  const jobs = CMP.flatMap(([mode, wait, name]) => seeds.map(seed => ({ mode, wait, name, seed })));
+  let j = 0, sim = null, acc = {};
+  $('cmpRun').disabled = true;
+  $('cmp').tBodies[0].innerHTML = '';
+  const tick = () => {
+    if (token !== cmpToken) return;                  // settings changed: stop
+    const t0 = performance.now();
+    while (performance.now() - t0 < 25) {
+      if (!sim) {
+        if (j >= jobs.length) return finishCompare(rows);
+        const job = jobs[j];
+        sim = newSim(source, N, job.mode, { ...base, waitSlice: job.wait }, job.seed);
+      }
+      for (let k = 0; k < 4000 && !sim.done; k++) step(sim);
+      if (sim.done) {
+        const job = jobs[j++], key = job.name;
+        const a = acc[key] || (acc[key] = { mode: job.mode, name: key, speed: 0, gt: 0, out: 0, full: 0, partial: 0, ideal: 0, n: 0 });
+        a.speed += sim.sorted / (sim.tick / 72000); a.gt += sim.tick; a.out += sim.outFull + sim.outPartial;
+        a.full += sim.outFull; a.partial += sim.outPartial; a.ideal += sim.perBatch; a.n++;
+        if (a.n === seeds.length) { rows.push(a); renderCompare(rows); }
+        sim = null;
+      }
+    }
+    $('cmpStatus').textContent = `Running ${Math.min(j + 1, jobs.length)} / ${jobs.length}…`;
+    setTimeout(tick, 0);
+  };
+  tick();
+}
+function renderCompare(rows) {
+  const best = Math.max(...rows.map(r => r.speed / r.n));
+  $('cmp').tBodies[0].innerHTML = rows.map(r => {
+    const n = r.n, sp = r.speed / n, out = r.out / n, ideal = r.ideal / n, extra = (out / ideal - 1) * 100;
+    return `<tr><td>${r.name}</td><td>${sp === best ? '<span class="muted">fastest</span>' : ''}</td>
+      <td class="${sp === best ? 'best' : ''}">${fmt(sp)}</td><td>${fmt(sp / 9000, 2)}×</td><td>${fmt(r.gt / n / 72000, 2)} h</td>
+      <td>${fmt(out)}</td><td>${fmt(r.full / n)} / ${fmt(r.partial / n)}</td><td>${fmt(ideal)}</td>
+      <td class="${extra > 0.05 ? 'bad' : ''}">${extra > 0.05 ? '+' + fmt(extra, 1) + '%' : 'ideal'}</td></tr>`;
+  }).join('');
+}
+function finishCompare(rows) {
+  renderCompare(rows);
+  $('cmpStatus').textContent = 'Done (average of 3 seeds).';
+  $('cmpRun').disabled = false;
+}
+
+// ---------------------------------------------------------------- precomputed table (viz/precompute.mjs -> stats.json)
+let PRE = null;
+const PRE_COLS = [                          // [key, 'Main name, detail'] in the order the table shows them
+  ['classic', 'Classic'], ['hyper', 'Hyperthreaded'], ['grouped', 'Classic, local groupers'], ['cgg', 'Classic, global grouper'],
+  ['multi', 'Multithreaded, global grouper'], ['multi+wait', 'Multithreaded, global · waits'], ['local', 'Multithreaded, local groupers'], ['local+wait', 'Multithreaded, local · waits'],
+  ['cartU', 'Classic, unst. handling'], ['cart', 'Classic, no unst. handling'], ['cartHU', 'Hyperthreaded, unst. handling'], ['cartH', 'Hyperthreaded, no unst. handling'],
+  ['cartGU', 'Local groupers, unst. handling'], ['cartG', 'Local groupers, no unst. handling'], ['cartGG', 'Global grouper, unst. handling'], ['cartGGo', 'Global grouper, no unst. handling'],
+  ['cartMG', 'Multithreaded, global grouper'], ['cartMG+wait', 'Multithreaded, global · waits'], ['cartML', 'Multithreaded, local groupers'], ['cartML+wait', 'Multithreaded, local · waits']];
+const twins = set => {                      // sets whose files hold exactly the same boxes
+  const root = set.sameAs || set.name;
+  return PRE.sets.filter(o => o !== set && (o.sameAs || o.name) === root).map(o => o.name);
+};
+// Every set: every logic (hopper and cart) as a column; the Logics menu hides some, SS picks the cart detection level
+let preKind = 'hopper', preN = 6, preSS = 'all', preHide = new Set();          // preHide: logic keys unticked in the Logics menu
+const ssKey = (k, ss) => `${k}@${ss}`;                      // cart results per detection level (precompute.mjs)
+function renderPre() {
+  if (!PRE) return;
+  const N = preN, row0 = PRE.sets[0]?.results[N] || {};
+  const has = (k, ss) => row0[ssKey(k, ss)] || (ss === 15 && row0[k]);   // older stats.json: plain key = SS15
+  const avail = PRE_COLS.filter(([k]) => k.startsWith('cart') === (preKind === 'cart') && (!k.startsWith('cart') ? row0[k] : [13, 14, 15].some(ss => has(k, ss))));
+  $('preSS').hidden = preKind !== 'cart';   // detection level only matters for cart slices
+  const group = (title, list) => list.length ? `<div class="pickhead">${title}</div>` + list.map(([k, nm]) => { const [a, ...b] = nm.split(/,\s*/); return `<label><input type="checkbox" data-k="${k}"${preHide.has(k) ? '' : ' checked'}>${a}${b.length ? ` <small>${b.join(', ')}</small>` : ''}</label>`; }).join('') : '';
+  $('prePick').innerHTML = group(preKind === 'cart' ? 'Cart slices' : 'Hopper slices', avail);
+  // one column per shown logic; a cart logic gets one column per selected detection level
+  const cols = [];
+  for (const [k, nm] of avail) {
+    if (preHide.has(k)) continue;
+    if (!k.startsWith('cart')) { cols.push({ key: k, name: nm }); continue; }
+    for (const ss of preSS === 'all' ? [13, 14, 15] : [preSS]) if (has(k, ss)) cols.push({ key: row0[ssKey(k, ss)] ? ssKey(k, ss) : k, name: nm, ss, cart: true });
+  }
+  const shown = avail.filter(([k]) => !preHide.has(k)).length;
+  $('preLogics').querySelector('summary').textContent = `Logics ${shown}/${avail.length} ▾`;
+  if (!cols.length) { $('pre').tHead.innerHTML = ''; $('pre').tBodies[0].innerHTML = '<tr><td class="muted" style="padding:16px">No logic selected: pick some in the Logics menu.</td></tr>'; return; }
+  const head = c => { const [a, ...b] = c.name.split(/,\s*/); return `${a}<small>${[...b, c.ss && preSS === 'all' ? `SS${c.ss}` : ''].filter(Boolean).join(' · ') || '&nbsp;'}</small>`; };
+  $('pre').tHead.innerHTML = `<tr><th class="setcol">Set</th>${cols.map(c => `<th>${head(c)}</th>`).join('')}</tr>`;
+  $('pre').tBodies[0].innerHTML = PRE.sets.filter(set => !set.sameAs).sort((a, b) => bySetOrder(a.name, b.name)).map(set => {   // identical files share one row
+    const r = set.results[N];
+    if (!r) return '';
+    const cells = cols.map(c => r[c.key]);
+    const fast = Math.max(...cells.map(c => c.speed));
+    const fastIdeal = Math.max(...cells.filter(c => c.out <= c.ideal + 0.05).map(c => c.speed));
+    const names = [set.name, ...twins(set)];
+    return `<tr><td><b>${names.join(' = ')}</b><small>${fmt(set.boxes)} boxes · ${fmt(set.items)} items${names.length > 1 ? ' · identical files' : ''}</small></td>` +
+      cells.map((c, i) => {
+        const extra = (c.out / c.ideal - 1) * 100, ideal = extra < 0.05;
+        const cls = (c.speed === fast ? (ideal ? 'fastideal' : 'fast') : ideal && c.speed === fastIdeal ? 'fastideal' : '') + '';
+        return `<td class="${cls}" title="${fmt(c.speed)} items/h · ${fmt(c.gt / 72000, 2)} h game time · ${fmt(c.full)} full + ${fmt(c.partial)} partial output boxes, batch ideal ${fmt(c.ideal)}">
+          <span class="sp">${fmt(c.speed / 9000, 2)}×</span><span class="bar"><span style="width:${(c.speed / fast * 100).toFixed(1)}%"></span></span>
+          <span class="meta">${fmt(c.out)} boxes <b class="tag ${ideal ? 'ok' : 'over'}">${ideal ? 'ideal' : '+' + fmt(extra, 0) + '%'}</b></span></td>`;
+      }).join('') + '</tr>';
+  }).join('');
+}
+function preButtons() {
+  for (const b of $('preKind').children) b.setAttribute('aria-pressed', b.dataset.v === preKind);
+  for (const b of $('preSS').children) b.setAttribute('aria-pressed', b.dataset.v === String(preSS));
+  for (const b of $('preN').children) b.setAttribute('aria-pressed', +b.dataset.v === preN);
+}
+async function loadPre() {
+  try { const v = JSON.parse(localStorage.getItem('cycvarPre') || '{}'); if (v.kind) preKind = v.kind; if (v.n) preN = v.n; if (v.ss) preSS = v.ss; if (v.hide) preHide = new Set(v.hide); } catch (e) { /* defaults */ }
+  try {
+    PRE = await (await fetch('stats.json', { cache: 'no-store' })).json();
+    if (!PRE.slices.includes(preN)) preN = PRE.slices.includes(6) ? 6 : PRE.slices[0];
+    $('preN').innerHTML = PRE.slices.map(n => `<button data-v="${n}" aria-pressed="false" title="${n} slice${n > 1 ? 's' : ''}">${n}</button>`).join('');
+    $('preNote').textContent = `Batches of ${PRE.batch}, average of ${PRE.seeds} input orders, Test_Set left out. Hover a cell for items/h, game time and full/partial boxes. Generated ${new Date(PRE.generated).toLocaleString()} (npm run viz:stats).`;
+    preButtons(); renderPre();
+  } catch (e) { $('preNote').textContent = 'No precomputed results yet: run  npm run viz:stats  once.'; }
+}
+function savePre() { try { localStorage.setItem('cycvarPre', JSON.stringify({ kind: preKind, n: preN, ss: preSS, hide: [...preHide] })); } catch (err) { /* not remembered */ } }
+for (const id of ['preKind', 'preSS', 'preN']) $(id).addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (id === 'preKind') preKind = b.dataset.v;
+  else if (id === 'preSS') preSS = b.dataset.v === 'all' ? 'all' : +b.dataset.v; else preN = +b.dataset.v;
+  savePre(); preButtons(); renderPre();
+});
+$('preLogics').addEventListener('change', e => {
+  const k = e.target.dataset.k;
+  if (!k) return;
+  if (e.target.checked) preHide.delete(k); else preHide.add(k);
+  savePre(); renderPre();
+});
+$('preLogics').addEventListener('click', e => {                 // quick picks: everything, only hopper, only cart, nothing
+  const b = e.target.closest('button[data-pick]');
+  if (!b) return;
+  const v = b.dataset.pick;
+  const mine = PRE_COLS.map(([k]) => k).filter(k => k.startsWith('cart') === (preKind === 'cart'));   // only this tab's logics
+  for (const k of mine) if (v === 'none') preHide.add(k); else preHide.delete(k);
+  savePre(); renderPre();
+});
+document.addEventListener('click', e => { for (const d of document.querySelectorAll('details.pop[open]')) if (!d.contains(e.target)) d.open = false; });
+function showPane(id) {
+  for (const t of document.querySelectorAll('.tabs [role=tab]')) t.setAttribute('aria-selected', t.dataset.pane === id);
+  for (const p of document.querySelectorAll('[role=tabpanel]')) p.hidden = p.id !== id;
+  try { localStorage.setItem('cycvarTab', id); } catch (e) { /* not remembered */ }
+  if (S && id === 'secOut') renderOutput(true);
+  if (S && id === 'secFlow') renderFlow();
+}
+for (const t of document.querySelectorAll('.tabs [role=tab]')) t.addEventListener('click', () => showPane(t.dataset.pane));
+try { const t = localStorage.getItem('cycvarTab'); if (t && document.querySelector(`.tabs [data-pane="${t}"]`)) showPane(t); } catch (e) { /* default tab */ }
+
+function showUnderBox() {           // cart under-box time for a 64-stack (cart already holding its filter item)
+  const p = params();
+  $('underBox').value = `${Math.max(p.dwell, cartFill(64, p.ss) - 1)} gt`;
+}
+function rebuild() {
+  showUnderBox();
+  if (!source) return;
+  const N = Math.max(1, Math.min(16, Math.floor(+$('slices').value || 6)));
+  $('slices').value = N;
+  S = newSim(source, N, logicMode(), params(), 0);   // boxes in schematic order
+  resize();
+  started = false; setPlaying(false); lockSetup(false);
+  selected = null;
+  draw(S); renderStats(); renderFlow(); resetCompare();
+  setStatus(`${sourceName}: ${fmt(S.nBoxes)} boxes, ${fmt(S.total)} items. Press Play.`);
+}
+// the "with groupers" entries cover both grouper layouts; the Groupers menu picks the sim mode
+function logicMode() {
+  const m = $('mode').value, local = $('grpKind').value === 'local';
+  const unst = $('unstH').checked;               // cart cores: unstackable handling on/off
+  return m === 'multi' ? (local ? 'local' : 'multi') : m === 'grouped' ? (local ? 'grouped' : 'cgg')
+    : m === 'cartC' ? (unst ? 'cartU' : 'cart') : m === 'cartHy' ? (unst ? 'cartHU' : 'cartH')
+    : m === 'cartGrp' ? (local ? (unst ? 'cartGU' : 'cartG') : (unst ? 'cartGG' : 'cartGGo'))
+    : m === 'cartMul' ? (local ? 'cartML' : 'cartMG') : m;   // multithreaded carts: unstackable handling changes nothing
+}
+function lockSetup(on) { for (const id of ['slices', 'mode', 'batch', 'grpKind', 'unstH']) $(id).disabled = on;
+  for (const b of document.querySelectorAll('.spin button')) b.disabled = on;
+  const m = $('mode').value, multi = m === 'multi' || m === 'cartMul';
+  $('grpOpts').hidden = !['multi', 'grouped', 'cartGrp', 'cartMul'].includes(m);
+  $('unstWrap').hidden = m === 'cartMul';
+  const lm = logicMode(), used = { front: true, group: !['classic', 'hyper', 'cart', 'cartU', 'cartH', 'cartHU'].includes(lm), hopper: !lm.startsWith('cart'), cart: lm.startsWith('cart') };
+  for (const el of document.querySelectorAll('.tgroup')) { el.classList.toggle('off', !used[el.dataset.g]); el.querySelector('small').textContent = used[el.dataset.g] ? '' : 'not used'; }
+  $('waitSlice').disabled = on || !multi; $('waitWrap').hidden = !multi; $('cartOpts').hidden = !$('mode').value.startsWith('cart'); }
+function setPlaying(on) {
+  playing = on && !S.done; $('play').textContent = playing ? 'Pause' : 'Play';
+  if (playing) { started = true; lockSetup(true); lastT = performance.now(); acc = 0; requestAnimationFrame(frame); }
+}
+function frame(now) {
+  if (!playing) return;
+  acc += Math.min(0.25, (now - lastT) / 1000) * +$('speed').value;
+  lastT = now;
+  let n = Math.floor(acc); acc -= n;
+  n = Math.min(n, 20000);
+  for (let i = 0; i < n && !S.done; i++) step(S);
+  draw(S); renderStats();
+  if (S.done) finish(); else requestAnimationFrame(frame);
+}
+function finish() {
+  setPlaying(false); draw(S); renderStats();
+  const sp = S.sorted / (S.tick / 72000), out = S.outFull + S.outPartial;
+  $('runs').tBodies[0].insertAdjacentHTML('afterbegin', `<tr><td>${sourceName}</td><td>${LOGIC_NAME[S.mode] + (S.p.waitSlice && ['multi', 'local', 'cartMG', 'cartML'].includes(S.mode) ? ' (waits)' : '')}</td><td>${S.N}</td>
+    <td>${fmt(sp)}</td><td>${fmt(sp / 9000, 2)}×</td><td>${fmt(out)}</td><td>${fmt(S.perBatch)}</td><td>${fmt((out / S.perBatch - 1) * 100, 1)}%</td></tr>`);
+  $('runsHint').hidden = true;
+  setStatus(`Finished in ${fmt(S.tick)} gt (${fmt(S.tick / 72000, 2)} h game time).`);
+}
+let outAt = 0;
+function renderOutput(force) {
+  const now = performance.now();
+  if (!force && now - outAt < 400) return;
+  outAt = now;
+  const out = S.outFull + S.outPartial, extra = out ? (out / S.perBatch - 1) * 100 : 0;
+  const cards = [
+    [fmt(out), 'output boxes'], [fmt(S.outFull), 'full'], [fmt(S.outPartial), 'partial'],
+    [fmt(S.ideal), 'ideal (whole set)'], [fmt(S.perBatch), 'ideal with batches'],
+    [S.done ? (extra >= 0 ? '+' : '') + fmt(extra, 1) + '%' : '…', 'extra vs batch ideal'],
+    [fmt(S.unstack), 'unstackables out'], [fmt(S.empties), 'empty boxes out'],
+  ];
+  drawOutChests();
+  $('outNote').textContent = S.tick === 0
+    ? 'Nothing sorted yet. The table lists every item in this set with its ideal box count; boxes appear as slices finish them.'
+    : S.done ? 'Run finished. Extra boxes = boxes made − ideal with batches.' : 'Run in progress: counts grow as slices send out output boxes.';
+  $('outStats').innerHTML = cards.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('');
+  const rows = [...S.items].filter(([it]) => stackSize(it) > 1)
+    .map(([it, e]) => ({ it, ...e, extra: e.full + e.partial - e.idealBatch }))
+    .sort((a, b) => b.items - a.items || (a.it < b.it ? -1 : 1));   // fixed order: rows never move during a run
+  const tb = $('outTable').tBodies[0];
+  tb.innerHTML = rows.map(r => `<tr><td><canvas width="64" height="64" data-item="${r.it}"></canvas></td><td>${niceName(r.it)}</td>
+    <td>${fmt(r.items)}</td><td>${r.full}</td><td>${r.partial}</td><td>${r.ideal}</td><td>${r.idealBatch}</td>
+    <td class="${r.extra > 0 ? 'bad' : ''}">${r.extra > 0 ? '+' + r.extra : S.done && r.full + r.partial ? '0' : ''}</td></tr>`).join('');
+  for (const c of tb.querySelectorAll('canvas')) {
+    const ic = iconOf(c.dataset.item), g = c.getContext('2d');
+    if (ic) g.drawImage(ic, 0, 0, 64, 64); else { g.fillStyle = texOf(c.dataset.item).color; g.fillRect(8, 8, 48, 48); }
+  }
+}
+function renderStats() {
+  renderOutput(S.done || !playing);
+  const h = S.tick / 72000, sp = h ? S.sorted / h : 0, busy = S.slices.reduce((a, s) => a + s.busy, 0) / Math.max(1, S.tick * S.N);
+  const items = [
+    [fmt(S.tick), 'game ticks'], [fmt(S.sorted) + ' / ' + fmt(S.total), 'items sorted'],
+    [fmt(sp), 'items per hour'], [fmt(sp / 9000, 2) + '×', 'hopper speed'],
+    [fmt(S.outFull + S.outPartial), 'output boxes'], [fmt(S.perBatch), 'ideal with batches'],
+    [fmt(busy * 100) + '%', 'slices busy'], isLocalM(S.mode) ? [fmt(S.buffer.length), 'boxes in buffer'] : S.mode !== 'multi' && S.mode !== 'cartMG' ? [fmt(S.cycles), 'cycles'] : [fmt(S.grpBusy / Math.max(1, S.tick) * 100) + '%', 'grouper busy'],
+    [`${S.batchNo} / ${Math.ceil(S.nBoxes / S.p.batch)}`, 'batch'],
+  ];
+  $('stats').innerHTML = items.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('');
+}
+function where(b) {
+  if (S.luif && S.luif.box === b) return 'in the LUIF';
+  if (S.buffer.includes(b)) return 'in the buffer';
+  if (S.input.includes(b)) return 'in the input chest';
+  if (S.gq) { const gi = S.gq.findIndex((q, i) => q.includes(b) || S.gcur[i]?.box === b); if (gi >= 0) return `at grouper ${gi + 1}`; }
+  if (S.feeding && S.feeding.includes(b)) return ['grouped', 'cgg', 'cartG', 'cartGU', 'cartGG', 'cartGGo'].includes(S.mode) ? 'about to enter the LUIF' : 'about to enter slice 1';
+  if (S.luifQ.includes(b)) return 'waiting for the LUIF';
+  if (S.slices.some(s => s.lu?.box === b)) return `in the LUIF of slice ${S.slices.findIndex(s => s.lu?.box === b) + 1}`;
+  if (S.slices.some(s => s.gHeld === b)) return `kept by grouper ${S.slices.findIndex(s => s.gHeld === b) + 1} as its filter`;
+  const sl = S.slices.find(s => s.cur === b || s.queue.includes(b));
+  if (sl) return `in slice ${sl.i + 1}`;
+  if (S.grp.group.includes(b)) return 'in the group being formed';
+  if (S.pending.some(g => g.boxes.includes(b))) return 'waiting for a free slice';
+  if (S.travel.some(m => m.what === b)) return 'on the way';
+  if (isEmpty(b)) return 'emptied';
+  return '';
+}
+let insHits = [];
+cv.addEventListener('click', e => {
+  const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / zoom, y = (e.clientY - r.top) / zoom;
+  const h = hits.findLast(h => x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h);
+  selected = h ? h.b : null;
+  draw(S);
+});
+$('play').addEventListener('click', () => setPlaying(!playing));
+$('step').addEventListener('click', () => { if (!S || S.done) return; started = true; lockSetup(true); step(S); draw(S); renderStats(); if (S.done) finish(); });
+$('reset').addEventListener('click', rebuild);
+$('cmpRun').addEventListener('click', runCompare);
+$('end').addEventListener('click', () => {
+  if (!S || S.done) return;
+  setPlaying(false); lockSetup(true); started = true;
+  $('end').disabled = true;
+  const chunk = () => {
+    const t0 = performance.now();
+    while (!S.done && performance.now() - t0 < 30) for (let i = 0; i < 2000 && !S.done; i++) step(S);
+    setStatus(`Running to the end… ${fmt(S.sorted / S.total * 100)}%`);
+    renderStats();
+    if (S.done) { $('end').disabled = false; finish(); } else setTimeout(chunk, 0);
+  };
+  chunk();
+});
+for (const b of document.querySelectorAll('.spin button')) b.addEventListener('click', e => {
+  e.preventDefault();
+  const el = $('slices');
+  if (el.disabled) return;
+  b.dataset.d > 0 ? el.stepUp() : el.stepDown();
+  el.dispatchEvent(new Event('change'));
+});
+for (const id of ['mode', 'grpKind', 'unstH', 'slices', 'batch', 'waitSlice']) $(id).addEventListener('change', () => { if (!started) rebuild(); });
+let uploaded = null;                           // { name, boxes } of the last opened file, listed in the set menu
+$('set').addEventListener('change', () => $('set').value === '__upload' ? useSource(uploaded.boxes, uploaded.name) : openSet($('set').value));
+$('upload').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const name = f.name.replace(/\.litematic$/i, ''), boxes = await loadLitematic(await f.arrayBuffer());
+    useSource(boxes, name);
+    uploaded = { name, boxes };
+    let opt = $('set').querySelector('option[value="__upload"]');
+    if (!opt) { opt = document.createElement('option'); opt.value = '__upload'; $('set').prepend(opt); }
+    opt.textContent = `${name} (opened file)`;
+    $('set').value = '__upload';
+  } catch (err) { setStatus(`Couldn't read ${f.name}: ${err.message}. Use a Litematica .litematic that contains shulker boxes.`, true); }
+  e.target.value = '';
+});
+window.addEventListener('resize', () => { if (S) { resize(); draw(S); } });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readColors(); S && draw(S); });
+
+function useSource(boxes, name) {
+  if (!boxes.length) throw new Error('no shulker boxes found in it');
+  source = boxes; sourceName = name; rebuild();
+}
+async function openSet(file) {
+  setStatus(`Loading ${file}…`);
+  try {
+    const res = await fetch('../data/sets/' + encodeURIComponent(file));
+    if (!res.ok) throw new Error(`server answered ${res.status}`);
+    useSource(await loadLitematic(await res.arrayBuffer()), file.replace(/\.litematic$/, ''));
+  } catch (err) { setStatus(`Couldn't load ${file}: ${err.message}.`, true); }
+}
+
+(async () => {
+  readColors();
+  const TGROUPS = [['front', 'Front end'], ['group', 'Groupers and travel'], ['hopper', 'Hopper slices'], ['cart', 'Cart slices']];
+  $('timings').innerHTML = TGROUPS.map(([g, title]) => `<section class="tgroup" data-g="${g}"><h5>${title}<small></small></h5><div class="timings">`
+    + TIMINGS.filter(([k, , , gr]) => gr === g && !CART_KEYS.includes(k) && k !== 'pull')   // a hopper moves 1 item per 8 gt: game rule, not a setting
+      .map(([k, l, d]) => `<div class="f"><label for="t_${k}" title="${l}">${l}</label><input autocomplete="off" id="t_${k}" type="number" min="0" value="${d}"></div>`).join('')
+    + (g === 'cart' ? '<p class="muted tnote">Cart detection and the gap are in the toolbar.</p>' : '') + '</div></section>').join('');
+  for (const [k] of TIMINGS) $('t_' + k)?.addEventListener('change', () => { if (!started) rebuild(); });
+  try {
+    try { ICONS = await (await fetch('textures/icons.json')).json(); } catch (e) { /* flat textures only */ }
+    const m = await (await fetch('textures/manifest.json')).json();
+    MANIFEST = { item: new Set(m.item), block: new Set(m.block) };
+  } catch (e) { setStatus('No textures found: run npm run viz once to copy them from your Minecraft jar. Using coloured squares.'); }
+  loadPre();
+  let sets = [];
+  try { sets = await (await fetch('sets.json')).json(); } catch (e) { /* none */ }
+  sets.sort(bySetOrder);
+  $('set').innerHTML = sets.map(s => `<option value="${s}">${s.replace(/(-54 Boxes)?\.litematic$/, '')}</option>`).join('');
+  const first = sets.find(s => s.startsWith('PU-03-Small')) || sets[0];
+  if (first) { $('set').value = first; openSet(first); }
+  else setStatus('No item sets found in data/sets. Open a .litematic above.', true);
+})();
+</script>
+</body>
+</html>
