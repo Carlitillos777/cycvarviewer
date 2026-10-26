@@ -1471,7 +1471,7 @@ async function openSet(file) {
   try { sets = await (await fetch('sets.json')).json(); } catch (e) { /* none */ }
   sets.sort(bySetOrder);
   $('set').innerHTML = sets.map(s => `<option value="${s}">${s.replace(/(-54 Boxes)?\.litematic$/, '')}</option>`).join('');
-  const first = sets.find(s => s.startsWith('PU-03-Small')) || sets[0];
+  const first = sets.find(s => s.startsWith('WaveProject1')) || sets[0];
   if (first) { $('set').value = first; openSet(first); }
   else setStatus('No item sets found in data/sets. Open a .litematic above.', true);
 })();
