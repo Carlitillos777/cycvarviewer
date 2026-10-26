@@ -32,6 +32,9 @@ jobs:
           cp -r data/sets _site/data/sets
           sed -i "s#'../data/sets/'#'data/sets/'#" _site/index.html
           grep -q "'data/sets/'" _site/index.html
+          # old links and browsers that cached the earlier redirect to viz/ land back on the viewer
+          mkdir -p _site/viz
+          echo '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=../?from=viz"><title>Cycvar Viewer</title><a href="../">Cycvar Viewer</a>' > _site/viz/index.html
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
